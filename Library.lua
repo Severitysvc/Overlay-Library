@@ -1,10 +1,7 @@
 local Library = {}
 Library.Instances = {}
-
 Library.LibraryDebugs = true
 Library.Hidden = false
-Library.FontID = ""
-Library.CurrentTheme = "Dark"
 
 local Signal = {}
 Signal.__index = Signal
@@ -23,19 +20,20 @@ local LocalPlayer = CloneReference(Players.LocalPlayer) :: Player
 Library.IsStudio = RunService:IsStudio()
 
 local Hui = (Library.IsStudio and game:GetService("Players").LocalPlayer.PlayerGui)
-	or gethui and gethui()
+	or (gethui and gethui())
 	or CloneReference(game:GetService("CoreGui"))
 local Protect = Library.IsStudio and (protectgui or syn and syn.protectgui) or function() end
 local Global = Library.IsStudio and shared or getgenv()
 
 if Global.OverlayInjected then
-	Global.OverlayPrompt:Fire() --// TODO: Add Prompt
+	Global.OverlayDestroy:Fire() --// TODO: Add Prompt
 end
 
 --// Signal
 function Signal.New()
 	local self = setmetatable({}, Signal)
 	self.Connections = {}
+	
 	return self
 end
 
@@ -120,12 +118,12 @@ function Signal:Animate(Object, Info, Propriety)
 end
 
 function Signal:Track(Object, OptionalTarget)
-	Signal:Assert(Object, "No object input", "Track")
+	Signal:Assert(Object, "Object is nil", "Track")
 
 	local IsTextObject = Object:IsA("TextLabel") or Object:IsA("TextButton") or Object:IsA("TextBox")
 	local IsImageObject = Object:IsA("ImageLabel") or Object:IsA("ImageButton")
 
-	Signal:Assert(IsTextObject or IsImageObject, "Object is not a text or image instance", "TrackVisibility")
+	Signal:Assert(IsTextObject or IsImageObject, "Object is not a TextLabel or ImageLabel", "Track")
 
 	local Content = IsTextObject and Object.Text or Object.Image
 	Object.Visible = Content ~= nil and Content ~= ""
@@ -156,8 +154,7 @@ function Signal:Track(Object, OptionalTarget)
 end
 
 function Signal:Callback(Func)
-	Signal:Assert(type(Func) == "function", "Argument is not a function", "Callback")
-
+	Signal:Assert(Func and type(Func) == "function", "Argument is nil and/or is not a function", "Callback")
 	local Callback = Signal.New()
 
 	Callback:Connect(function(Arg)
@@ -179,15 +176,8 @@ function Library.SetHidden(Bool)
 end
 
 function Library.SetGlobal(Name, Value)
-	Signal:Assert(Global, "No global env found")
-
+	Signal:Assert(Global, "Global is nil", "SetGlobal")
 	Global[Name] = Value
-end
-
-function Library.GetImage(Asset)
-	if Asset:find("rbxassetid") then
-		return Asset
-	end
 end
 
 function Library.New(ClassName, Properties)
@@ -572,6 +562,25 @@ function Library.SetDraggable(Object, Handle)
 end
 
 local OnDestroy = Signal.New()
+Global.OverlayDestroy = OnDestroy
+
+local UI = Library.New("ScreenGui", {
+	Name = "UI",
+	IgnoreGuiInset = true,
+	Parent = Hui,
+	DisplayOrder = 999,
+}) :: ScreenGui
+
+Protect(UI)
+
+local ContextMenus = Library.New("Folder", { Parent = UI, Name = "ContextMenus" })
+local Notifications = Library.New("Folder", { Parent = UI, Name = "Notifications" })
+
+if not Library.IsStudio then
+	if Global.sethiddenpropriety then
+		Global.sethiddenpropriety(UI, "OnTopOfCoreBlur", true)
+	end
+end
 
 --// Window
 function Library:Window(Data)
@@ -579,38 +588,23 @@ function Library:Window(Data)
 	local DragHoverStart = Signal.New()
 	local DragHoverEnd = Signal.New()
 
-	local UI = Library.New("ScreenGui", {
-		Name = "UI",
-		IgnoreGuiInset = true,
-		Parent = Hui,
-		DisplayOrder = 999,
-	}) :: ScreenGui
-
-	Protect(UI)
-	local _UIScale = Library.New("UIScale", { Parent = UI, Scale = Data.UIScale or 1 }) :: UIScale
-	local ContextMenus = Library.New("Folder", { Parent = UI })
-
-	if not Library.IsStudio then
-		if Global.sethiddenpropriety then
-			Global.sethiddenpropriety(UI, "OnTopOfCoreBlur", true)
-		end
-	end
-
-	Controller.SelectedTab = nil
-	Controller.SelectedContainer = nil
-
 	local Minimize = Signal.New()
 	local UnMinimize = Signal.New()
 	local SetProfileAnonimity = Signal.New()
+
+	local ActiveCloseThread = nil
+	local CloseThread = Signal.New()
+
+	local _UIScale = Library.New("UIScale", { Parent = UI, Scale = Data.UIScale or 1 }) :: UIScale
+
+	Controller.SelectedTab = nil
+	Controller.SelectedContainer = nil
 
 	Controller.OnDestroy = OnDestroy
 	Controller.OnMinimize = Minimize
 
 	Controller.MinimizeKeybind = Data.MinimizeKeybind or Enum.KeyCode.RightShift
 	Controller.IsMinimized = false
-
-	local ActiveCloseThread = nil
-	local CloseThread = Signal.New()
 
 	local Window = Library.New("Frame", {
 		Name = "Window",
@@ -1857,12 +1851,6 @@ function Library:Window(Data)
 					BorderMode = Enum.BorderMode.Outline,
 					ClipsDescendants = false,
 					Transparency = 1,
-					FontFace = Font.new(
-						"rbxasset://fonts/families/SourceSansPro.json",
-						Enum.FontWeight.Regular,
-						Enum.FontStyle.Normal
-					),
-					RichText = false,
 					Parent = Interaction,
 				})
 
@@ -2365,6 +2353,166 @@ function Library:Window(Data)
 			return Methods, Body
 		end
 
+		function Elements:Keybind(Data)
+			local Methods = {}
+			local Body = Library.SetupCommonElementBody({
+				Title = Data and (Data.Title or Data.Name) or "Toggle",
+				Description = Data and (Data.Desc or Data.Description) or "Description",
+				Icon = Data and (Data.Icon or Data.Image) or "",
+				StrokeEnabled = Data and (Data.StrokeEnabled or Data.Stroke) or false,
+				Transparency = Data and (Data.Transparency or Data.TransparencyPhase) or "Min",
+				Parent = Container,
+			})
+
+			local Interaction = Body.Interaction
+			local ElementBody = Body.ElementBody
+			local Header = Body.Header
+
+			Header.Size = UDim2.fromScale(0.6, 0)
+			Interaction.Size = UDim2.fromScale(0.4, 0)
+
+			local Input = Library.New("Frame", {
+				Name = "Input",
+				LayoutOrder = 1,
+				Size = UDim2.new(0, 0, 0, 35),
+				AutomaticSize = Enum.AutomaticSize.X,
+				BackgroundTransparency = 0.95,
+				BorderSizePixel = 0,
+				Parent = Interaction,
+			}) :: Frame
+
+			Library.New("UICorner", { CornerRadius = UDim.new(0, 8), Parent = Input })
+			Library.New("UIPadding", {
+				PaddingTop = UDim.new(0, 3),
+				PaddingBottom = UDim.new(0, 3),
+				PaddingLeft = UDim.new(0, 8),
+				PaddingRight = UDim.new(0, 8),
+				Parent = Input,
+			})
+
+			local BindName = Library.New("TextLabel", {
+				Name = "BindName",
+				AutomaticSize = Enum.AutomaticSize.XY,
+				BackgroundTransparency = 1,
+				Text = "",
+				TextColor3 = Color3.fromRGB(255, 255, 255),
+				TextSize = 15,
+				TextTransparency = 0.2,
+				TextWrapped = true,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextYAlignment = Enum.TextYAlignment.Center,
+				FontFace = Font.new("rbxassetid://16658221428", Enum.FontWeight.SemiBold),
+				RichText = true,
+				Parent = Input,
+			})
+
+			Library.New("UIListLayout", {
+				FillDirection = Enum.FillDirection.Horizontal,
+				HorizontalAlignment = Enum.HorizontalAlignment.Left,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 4),
+				Parent = Input,
+			})
+
+			--// Logic
+			local Value = Data and (Data.Value or Data.Default) or Enum.KeyCode.Asterisk
+			local Callback = Signal:Callback(Data and Data.Callback)
+			local OnKeypressCalback = Signal:Callback(Data and (Data.KeyPressCallback or Data.OnKeyPressed))
+
+			local OnListenStart = Signal.New()
+			local OnListenEnd = Signal.New()
+
+			local ListeningConnection
+			local IsListening = false
+
+			BindName.Text = Value.Name
+			Callback:Fire(Value)
+
+			OnListenStart:Connect(function()
+				if IsListening then
+					OnListenEnd:Fire(Value)
+
+					if ListeningConnection then
+						ListeningConnection:Disconnect()
+					end
+				end
+
+				local FireInput
+
+				BindName.Text = "Listening..."
+				BindName.TextTransparency = 0.4
+
+				ListeningConnection = UserInputService.InputBegan:Connect(function(Input, Procesed)
+					if Procesed then
+						return
+					end
+
+					if
+						Signal:MatchInput(Input, Enum.UserInputType.MouseButton1)
+						or Signal:MatchInput(Input, Enum.UserInputType.MouseButton2)
+						or Signal:MatchInput(Input, Enum.UserInputType.MouseButton3)
+					then
+						FireInput = Input.UserInputType
+					elseif Input.KeyCode then
+						FireInput = Input.KeyCode
+					end
+
+					if FireInput then
+						OnListenEnd:Fire(FireInput)
+					end
+				end)
+			end)
+
+			OnListenEnd:Connect(function(Bind: Enum.KeyCode)
+				if ListeningConnection then
+					ListeningConnection:Disconnect()
+					ListeningConnection = nil
+				end
+
+				IsListening = false
+
+				if Bind == Value then
+					BindName.Text = Value.Name
+					BindName.TextTransparency = 0.2
+
+					return
+				end
+
+				BindName.Text = Bind.Name
+				BindName.TextTransparency = 0.2
+
+				Value = Bind
+				Callback:Fire(Bind)
+			end)
+
+			ElementBody.MouseButton1Click:Connect(function()
+				OnListenStart:Fire()
+			end)
+
+			UserInputService.InputBegan:Connect(function(Input, Procesed)
+				if Procesed then
+					return
+				end
+
+				if Signal:MatchInput(Input, Value) then
+					OnKeypressCalback:Fire()
+				end
+			end)
+
+			function Methods:Set(Keybind)
+				Signal:Assert(
+					Keybind and typeof(Keybind) == "EnumItem",
+					"Argument is nil and/or is not an Enum Item",
+					"Keybind:Set"
+				)
+
+				OnListenEnd:Fire(Keybind)
+			end
+
+			return Methods, Body
+		end
+
 		function Elements:Section(Data)
 			local Methods = {}
 			local Body = Library.SetupCommonElementBody({
@@ -2695,6 +2843,7 @@ function Library:Window(Data)
 					Min = Args and (Args.Min or Args.MinimumValue) or 0,
 					Step = Args and (Args.Step or Args.Threshold) or 0,
 					Value = Args and (Args.Value or Args.Default) or (Args.Min or Args.MinimumValue) or 0,
+					SmoothSlide = Args and (Args.SmoothSlide or Args.SmoothSlider) or false,
 					Callback = Args.Callback,
 				})
 
@@ -3012,11 +3161,16 @@ function Library:Window(Data)
 	end
 
 	function Controller:SetBackgroundImage(Image)
-		BackgroundImage.Image = tostring(Image)
+		Signal:Assert(Image and type(Image) == "string", "Argument is nil and/or is not a string", "SetBackgroundImage")
+		BackgroundImage.Image = Image
 	end
 
 	function Controller:SetBackgroundImageTransparency(Transparency)
-		Signal:Assert(type(Transparency) == "number", "Argument is not a number")
+		Signal:Assert(
+			Transparency and type(Transparency) == "number",
+			"Argument is nil and/or is not a number",
+			"SetBackgroundImageTransparency"
+		)
 
 		BackgroundImage.ImageTransparency = Transparency
 	end
@@ -3139,7 +3293,7 @@ function Library:Window(Data)
 	end
 
 	function Controller:SetWindowSize(Size)
-		Signal:Assert(typeof(Size) == "UDim2", "Invalid typeof size, Expected UDim2", "SetWindowSize")
+		Signal:Assert(Size and typeof(Size) == "UDim2", "Argument is nil and/or is not an UDIM2 Value", "SetWindowSize")
 
 		Signal:Animate(
 			Window,
@@ -3151,13 +3305,17 @@ function Library:Window(Data)
 	end
 
 	function Controller:SetUIScale(Scale)
-		Signal:Assert(Scale and type(Scale) == "number", "Scale argument is not valid", "Set UI Scale")
+		Signal:Assert(Scale and type(Scale) == "number", "Argument is nil and/or is not a number", "SetUIScale")
 
 		_UIScale.Scale = Scale
 	end
 
 	function Controller:SetWindowTransparency(Transparency)
-		Signal:Assert(type(Transparency) == "number", "Argument is not a number")
+		Signal:Assert(
+			Transparency and type(Transparency) == "number",
+			"Argument is nil and/or is not a number",
+			"SetWindowTransparency"
+		)
 
 		Signal:Animate(
 			Window,
@@ -3169,7 +3327,11 @@ function Library:Window(Data)
 	end
 
 	function Controller:SetMinimizeKeybind(Keybind)
-		Signal:Assert(Keybind and typeof(Keybind) == "Enum", "Invalid keybind arg", "SetMinimizeKeybind")
+		Signal:Assert(
+			Keybind and typeof(Keybind) == "EnumItem",
+			"Argument is nil and/or is not an EnumItem",
+			"SetMinimizeKeybind"
+		)
 		Controller.MinimizeKeybind = Keybind
 	end
 
