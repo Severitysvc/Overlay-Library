@@ -6,6 +6,11 @@ Library.Hidden = false
 local Signal = {}
 Signal.__index = Signal
 
+local ThemeManager = {}
+ThemeManager.__index = ThemeManager
+
+local Resolved = setmetatable({}, { __mode = "k" })
+
 local CloneReference = cloneref or clonereference or function(Object)
 	return Object
 end
@@ -33,7 +38,7 @@ end
 function Signal.New()
 	local self = setmetatable({}, Signal)
 	self.Connections = {}
-	
+
 	return self
 end
 
@@ -166,6 +171,201 @@ end
 
 Library.Signal = Signal
 
+--// Theme
+ThemeManager.CurrentTheme = nil
+ThemeManager.ThemeChanged = Signal.New()
+
+function ThemeManager.New(Data)
+	Signal:Assert(Data, "No data found", "ThemeManager.New")
+
+	local Theme = setmetatable({
+		Name = Data.Name or "Theme",
+		BackgroundColor = Data.BackgroundColor or ThemeManager.CurrentTheme.BackgroundColor,
+		AccentColor = Data.AccentColor or ThemeManager.CurrentTheme.AccentColor,
+		TextColor = Data.TextColor or ThemeManager.CurrentTheme.AccentColor,
+		IconColor = Data.IconColor or ThemeManager.CurrentTheme.AccentColor,
+	}, ThemeManager)
+
+	return Theme
+end
+
+function ThemeManager:ApplyTheme(Theme)
+	Signal:Assert(Theme, "No theme provided", "ApplyTheme")
+
+	local OldTheme = self.CurrentTheme
+	self.CurrentTheme = Theme
+
+	local ProprietyMap = {
+		Background = Theme.BackgroundColor,
+		Accent = Theme.AccentColor,
+		Text = Theme.TextColor,
+		Icon = Theme.IconColor,
+	}
+
+	for _, Instance in ipairs(Library.Instances) do
+		if Instance:GetAttribute("Ignore") or not Instance:IsA("GuiObject") then
+			continue
+		end
+
+		if not Resolved[Instance] then
+			Resolved[Instance] = {}
+		end
+
+		local Cache = Resolved[Instance]
+
+		if Instance:IsA("Frame") or Instance:IsA("TextButton") then
+			if not Cache.BackgroundColor3 and OldTheme then
+				local Color = Instance.BackgroundColor3
+
+				if
+					math.abs(Color.R - OldTheme.BackgroundColor.R) < 0.005
+					and math.abs(Color.G - OldTheme.BackgroundColor.G) < 0.005
+					and math.abs(Color.B - OldTheme.BackgroundColor.B) < 0.005
+				then
+					Cache.BackgroundColor3 = "Background"
+				elseif
+					math.abs(Color.R - OldTheme.AccentColor.R) < 0.005
+					and math.abs(Color.G - OldTheme.AccentColor.G) < 0.005
+					and math.abs(Color.B - OldTheme.AccentColor.B) < 0.005
+				then
+					Cache.BackgroundColor3 = "Accent"
+				end
+			end
+
+			local Role = Cache.BackgroundColor3
+
+			if Role and ProprietyMap[Role] then
+				Signal:Animate(
+					Instance,
+					{ Time = 0.25, Style = Enum.EasingStyle.Sine, Direction = Enum.EasingDirection.Out },
+					{ BackgroundColor3 = ProprietyMap[Role] }
+				)
+			end
+		end
+
+		if Instance:IsA("TextLabel") or Instance:IsA("TextButton") or Instance:IsA("TextBox") then
+			if not Cache.TextColor3 and OldTheme then
+				local Color = Instance.TextColor3
+
+				if
+					math.abs(Color.R - OldTheme.TextColor.R) < 0.005
+					and math.abs(Color.G - OldTheme.TextColor.G) < 0.005
+					and math.abs(Color.B - OldTheme.TextColor.B) < 0.005
+				then
+					Cache.TextColor3 = "Text"
+				end
+			end
+
+			local Role = Cache.TextColor3
+
+			if Role and ProprietyMap[Role] then
+				Signal:Animate(
+					Instance,
+					{ Time = 0.25, Style = Enum.EasingStyle.Sine, Direction = Enum.EasingDirection.Out },
+					{ TextColor3 = ProprietyMap[Role] }
+				)
+			end
+		end
+
+		if Instance:IsA("ImageLabel") or Instance:IsA("ImageButton") then
+			if not Cache.ImageColor3 and OldTheme then
+				local Color = Instance.ImageColor3
+
+				if
+					math.abs(Color.R - OldTheme.IconColor.R) < 0.005
+					and math.abs(Color.G - OldTheme.IconColor.G) < 0.005
+					and math.abs(Color.B - OldTheme.IconColor.B) < 0.005
+				then
+					Cache.ImageColor3 = "Icon"
+				elseif
+					math.abs(Color.R - OldTheme.AccentColor.R) < 0.005
+					and math.abs(Color.G - OldTheme.AccentColor.G) < 0.005
+					and math.abs(Color.B - OldTheme.AccentColor.B) < 0.005
+				then
+					Cache.ImageColor3 = "Accent"
+				end
+			end
+
+			local Role = Cache.ImageColor3
+
+			if Role and ProprietyMap[Role] then
+				Signal:Animate(
+					Instance,
+					{ Time = 0.25, Style = Enum.EasingStyle.Sine, Direction = Enum.EasingDirection.Out },
+					{ ImageColor3 = ProprietyMap[Role] }
+				)
+			end
+		end
+
+		local Stroke = Instance:FindFirstChildOfClass("UIStroke")
+
+		if Stroke then
+			if not Cache.StrokeColor and OldTheme then
+				local Color = Stroke.Color
+
+				if
+					math.abs(Color.R - OldTheme.AccentColor.R) < 0.005
+					and math.abs(Color.G - OldTheme.AccentColor.G) < 0.005
+					and math.abs(Color.B - OldTheme.AccentColor.B) < 0.005
+				then
+					Cache.StrokeColor = "Accent"
+				end
+			end
+
+			local Role = Cache.StrokeColor
+
+			if Role and ProprietyMap[Role] then
+				Signal:Animate(
+					Stroke,
+					{ Time = 0.25, Style = Enum.EasingStyle.Sine, Direction = Enum.EasingDirection.Out },
+					{ Color = ProprietyMap[Role] }
+				)
+			end
+		end
+	end
+
+	self.ThemeChanged:Fire(Theme)
+end
+function ThemeManager:GetTheme()
+	return self.CurrentTheme
+end
+
+ThemeManager.Themes = {
+	["Dark"] = ThemeManager.New({
+		Name = "Dark",
+		BackgroundColor = Color3.fromRGB(9, 9, 9),
+		AccentColor = Color3.fromRGB(255, 255, 255),
+		TextColor = Color3.fromRGB(255, 255, 255),
+		IconColor = Color3.fromRGB(255, 255, 255),
+	}),
+
+	["Light"] = ThemeManager.New({
+		Name = "Light",
+		BackgroundColor = Color3.fromRGB(255, 255, 255),
+		AccentColor = Color3.fromRGB(0, 0, 0),
+		TextColor = Color3.fromRGB(0, 0, 0),
+		IconColor = Color3.fromRGB(0, 0, 0),
+	}),
+
+	["Midnight"] = ThemeManager.New({
+		Name = "Midnight",
+		BackgroundColor = Color3.fromRGB(24, 30, 66),
+		AccentColor = Color3.fromRGB(119, 135, 255),
+		TextColor = Color3.fromRGB(183, 197, 255),
+		IconColor = Color3.fromRGB(98, 125, 255),
+	}),
+
+	["Crimson"] = ThemeManager.New({
+		Name = "Crimson",
+		BackgroundColor = Color3.fromRGB(24, 9, 9),
+		AccentColor = Color3.fromRGB(255, 119, 119),
+		TextColor = Color3.fromRGB(255, 183, 183),
+		IconColor = Color3.fromRGB(255, 52, 52),
+	}),
+}
+
+ThemeManager.CurrentTheme = ThemeManager.Themes.Midnight
+
 --// Library Methods
 function Library.SetLibraryDebugs(Bool)
 	Library.LibraryDebugs = Bool
@@ -239,7 +439,7 @@ function Library.SetupCommonElementBody(Data)
 		Position = UDim2.new(0, 0, 0.057, 0),
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundColor3 = ThemeManager.CurrentTheme.AccentColor,
 		BackgroundTransparency = 0,
 		BorderSizePixel = 0,
 		Parent = Data.Parent,
@@ -276,7 +476,7 @@ function Library.SetupCommonElementBody(Data)
 
 	Library.New("UIStroke", {
 		Transparency = Data.StrokeEnabled and (ElementBody.BackgroundTransparency - 0.025) or 1,
-		Color = Color3.fromRGB(255, 255, 255),
+		Color = ThemeManager.CurrentTheme.AccentColor,
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 		Parent = ElementBody,
 	})
@@ -305,7 +505,7 @@ function Library.SetupCommonElementBody(Data)
 		Position = UDim2.new(0, 0, 0.5, 0),
 		Size = UDim2.new(0, 40, 0, 40),
 		AnchorPoint = Vector2.new(0, 0.5),
-		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundColor3 = ThemeManager.CurrentTheme.AccentColor,
 		BackgroundTransparency = 0.95,
 		BorderSizePixel = 0,
 		Parent = Header,
@@ -321,6 +521,7 @@ function Library.SetupCommonElementBody(Data)
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		BackgroundTransparency = 1,
 		Image = Data.Icon,
+		ImageColor3 = ThemeManager.CurrentTheme.IconColor,
 		ImageTransparency = 0.2,
 		Parent = Icon,
 	})
@@ -340,7 +541,7 @@ function Library.SetupCommonElementBody(Data)
 		AutomaticSize = Enum.AutomaticSize.XY,
 		BackgroundTransparency = 1,
 		Text = Data.Title,
-		TextColor3 = Color3.fromRGB(255, 255, 255),
+		TextColor3 = ThemeManager.CurrentTheme.TextColor,
 		TextSize = 18,
 		TextTransparency = 0.2,
 		TextWrapped = true,
@@ -355,7 +556,7 @@ function Library.SetupCommonElementBody(Data)
 		AutomaticSize = Enum.AutomaticSize.XY,
 		BackgroundTransparency = 1,
 		Text = Data.Description,
-		TextColor3 = Color3.fromRGB(255, 255, 255),
+		TextColor3 = ThemeManager.CurrentTheme.TextColor,
 		TextSize = 14,
 		TextTransparency = 0.4,
 		TextWrapped = true,
@@ -561,6 +762,39 @@ function Library.SetDraggable(Object, Handle)
 	}
 end
 
+function Library:GetCurrentTheme()
+	return ThemeManager:GetTheme()
+end
+
+function Library:GetThemes()
+	local Themes = {}
+
+	for _, Value in pairs(ThemeManager.Themes) do
+		table.insert(Themes, Value.Name)
+	end
+
+	return Themes
+end
+
+function Library:SetTheme(Theme)
+	Signal:Assert(ThemeManager.Themes[Theme], "Invalid theme name", "SetTheme")
+
+	local ThemeData = ThemeManager.Themes[Theme]
+	ThemeManager:ApplyTheme(ThemeData)
+end
+
+function Library:CreateTheme(Data)
+	local ThemeData = ThemeManager.New({
+		Name = Data and (Data.Name or Data.ThemeName) or "Unnamed Theme",
+		BackgroundColor = Data and Data.BackgroundColor or Color3.fromRGB(9, 9, 9),
+		AccentColor = Data and Data.AccentColor or Color3.fromRGB(255, 255, 255),
+		TextColor = Data and Data.TextColor or Color3.fromRGB(255, 255, 255),
+		IconColor = Data and Data.IconColor or Color3.fromRGB(255,255,255),
+	})
+
+	ThemeManager.Themes[Data.Name] = ThemeData
+end
+
 local OnDestroy = Signal.New()
 Global.OverlayDestroy = OnDestroy
 
@@ -574,13 +808,116 @@ local UI = Library.New("ScreenGui", {
 Protect(UI)
 
 local ContextMenus = Library.New("Folder", { Parent = UI, Name = "ContextMenus" })
-local Notifications = Library.New("Folder", { Parent = UI, Name = "Notifications" })
+local NotificationZone = Library.New("Frame", {
+	Name = "NotificationZone",
+	Position = UDim2.new(1, 0, 1, 0),
+	Size = UDim2.new(0.18, 0, 1, 0),
+	AnchorPoint = Vector2.new(1, 1),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	Parent = UI,
+})
+
+Library.New("UIPadding", {
+	PaddingTop = UDim.new(0, 12),
+	PaddingBottom = UDim.new(0, 12),
+	PaddingLeft = UDim.new(0, 12),
+	PaddingRight = UDim.new(0, 12),
+	Parent = NotificationZone,
+})
+
+local AddToQueue = Signal.New()
+local RemoveFromQueue = Signal.New()
 
 if not Library.IsStudio then
 	if Global.sethiddenpropriety then
 		Global.sethiddenpropriety(UI, "OnTopOfCoreBlur", true)
 	end
 end
+
+AddToQueue:Connect(function(Notification)
+	Signal:Assert(Notification and Notification.Body, "Argument is nil and/or no body was found", "AddToQueue")
+
+	local Body = Notification:FindFirstChildOfClass("TextButton")
+	local StackSizeY = 0
+
+	Signal:Animate(
+		Body,
+		{ Time = 0.25, Style = Enum.EasingStyle.Sine, Direction = Enum.EasingDirection.Out },
+		{ Position = UDim2.new(0, 0, 0, 0) }
+	)
+
+	StackSizeY = StackSizeY + Body.AbsoluteSize.Y + 10
+
+	local Old = {}
+	for _, Child in ipairs(NotificationZone:GetChildren()) do
+		if Child:IsA("Frame") and Child ~= Notification then
+			table.insert(Old, Child)
+		end
+	end
+
+	for I = #Old, 1, -1 do
+		local OldFrame = Old[I]
+
+		Signal:Animate(
+			OldFrame,
+			{ Time = 0.25, Style = Enum.EasingStyle.Sine, Direction = Enum.EasingDirection.Out },
+			{ Position = UDim2.new(1, 0, 1, -StackSizeY) }
+		)
+
+		StackSizeY = StackSizeY + OldFrame.AbsoluteSize.Y + 10
+	end
+end)
+
+RemoveFromQueue:Connect(function(Notification)
+	Signal:Assert(Notification and Notification.Body, "Argument is nil and/or no body was found", "RemoveFromQueue")
+
+	local Body = Notification:FindFirstChildOfClass("TextButton")
+	local StackSizeY = 0
+
+	local Size = Body.AbsoluteSize
+	Body.Size = UDim2.fromOffset(Size.X, Size.Y)
+	Body.AutomaticSize = Enum.AutomaticSize.None
+
+	for _, Frame in ipairs(Body:GetChildren()) do
+		if Frame:IsA("Frame") then
+			Frame.Visible = false
+		end
+	end
+
+	Signal:Animate(Body, { Time = 0.15, Style = Enum.EasingStyle.Back, Direction = Enum.EasingDirection.In }, {
+		Size = UDim2.fromOffset(Size.X - 20, Size.Y - 20),
+		BackgroundTransparency = 1,
+		Position = UDim2.fromScale(0.1, -0.1),
+	})
+
+	task.delay(0.2, function()
+		Notification.Visible = false
+	end)
+
+	local Old = {}
+	for _, Child in ipairs(NotificationZone:GetChildren()) do
+		if Child:IsA("Frame") and Child ~= Notification then
+			table.insert(Old, Child)
+		end
+	end
+
+	for I = #Old, 1, -1 do
+		local OldFrame = Old[I]
+
+		Signal:Animate(
+			OldFrame,
+			{ Time = 0.25, Style = Enum.EasingStyle.Sine, Direction = Enum.EasingDirection.Out },
+			{ Position = UDim2.new(1, 0, 1, -StackSizeY) }
+		)
+
+		StackSizeY = StackSizeY + OldFrame.AbsoluteSize.Y + 10
+	end
+
+	task.delay(0.25, function()
+		Notification:Destroy()
+	end)
+end)
 
 --// Window
 function Library:Window(Data)
@@ -611,7 +948,7 @@ function Library:Window(Data)
 		Position = UDim2.new(0.5, 0, 0.5, 0),
 		Size = Data.Size or UDim2.new(0, 700, 0, 500),
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundColor3 = Data.BackgroundColor or Color3.fromRGB(9, 9, 9),
+		BackgroundColor3 = ThemeManager.CurrentTheme.BackgroundColor,
 		BackgroundTransparency = Data.BackgroundTransparency or 0.1,
 		BorderSizePixel = 0,
 		Parent = UI,
@@ -627,14 +964,13 @@ function Library:Window(Data)
 		ZIndex = 1,
 		LayoutOrder = 0,
 		Position = UDim2.new(0.500, 0, -0.025, 0),
-		Size = UDim2.new(0.300, 0, 0.000, 6),
-		AnchorPoint = Vector2.new(0.500, 0.000),
+		Size = UDim2.new(0.300, 0, 0, 6),
+		AnchorPoint = Vector2.new(0.500, 0),
 		AutomaticSize = Enum.AutomaticSize.None,
 		SizeConstraint = Enum.SizeConstraint.RelativeXY,
 		Rotation = 0,
 		Active = false,
 		Selectable = false,
-		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0.9,
 		BorderColor3 = Color3.fromRGB(0, 0, 0),
 		BorderSizePixel = 0,
@@ -705,7 +1041,7 @@ function Library:Window(Data)
 
 	Library.New("UIStroke", {
 		Transparency = 0.9,
-		Color = Color3.fromRGB(255, 255, 255),
+		Color = ThemeManager.CurrentTheme.AccentColor,
 		Parent = Window,
 	})
 
@@ -923,7 +1259,7 @@ function Library:Window(Data)
 		AutomaticSize = Enum.AutomaticSize.XY,
 		BackgroundTransparency = 1,
 		Text = Data.Title,
-		TextColor3 = Color3.fromRGB(255, 255, 255),
+		TextColor3 = ThemeManager.CurrentTheme.TextColor,
 		TextSize = 20,
 		TextTransparency = 0.2,
 		TextXAlignment = Enum.TextXAlignment.Center,
@@ -938,7 +1274,7 @@ function Library:Window(Data)
 		AutomaticSize = Enum.AutomaticSize.XY,
 		BackgroundTransparency = 1,
 		Text = Data.SubTitle,
-		TextColor3 = Color3.fromRGB(255, 255, 255),
+		TextColor3 = ThemeManager.CurrentTheme.TextColor,
 		TextSize = 16,
 		TextTransparency = 0.4,
 		TextWrapped = true,
@@ -1243,7 +1579,7 @@ function Library:Window(Data)
 			Position = UDim2.new(0.075, 0, 0, 0),
 			Size = UDim2.new(1, 0, 0, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
-			BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+			BackgroundColor3 = ThemeManager.CurrentTheme.AccentColor,
 			BackgroundTransparency = 0.95,
 			BorderSizePixel = 0,
 			Parent = Tabs,
@@ -1266,7 +1602,7 @@ function Library:Window(Data)
 			Parent = Tab,
 		})
 
-		Library.New("UIStroke", { Color = Color3.fromRGB(255, 255, 255), Parent = Tab, Transparency = 1 })
+		Library.New("UIStroke", { Color = ThemeManager.CurrentTheme.AccentColor, Parent = Tab, Transparency = 1 })
 
 		local IconDisplay = Library.New("ImageLabel", {
 			Name = "Icon",
@@ -1274,6 +1610,7 @@ function Library:Window(Data)
 			Position = UDim2.new(-0.005, 0, 0, 0),
 			Size = UDim2.new(0, 20, 0, 20),
 			BackgroundTransparency = 1,
+			ImageColor3 = ThemeManager.CurrentTheme.IconColor,
 			Image = Data.Icon,
 			ImageTransparency = 0.2,
 			Parent = Tab,
@@ -1288,7 +1625,7 @@ function Library:Window(Data)
 			Size = UDim2.new(0.8, 0, 0, 0),
 			BackgroundTransparency = 1,
 			Text = Data.Title,
-			TextColor3 = Color3.fromRGB(220, 220, 220),
+			TextColor3 = ThemeManager.CurrentTheme.TextColor,
 			TextSize = 16,
 			TextTransparency = 0.2,
 			TextWrapped = true,
@@ -1350,7 +1687,7 @@ function Library:Window(Data)
 				AutomaticSize = Enum.AutomaticSize.XY,
 				BackgroundTransparency = 1,
 				Text = Data and (Data.Title or Data.Name) or "Section",
-				TextColor3 = Color3.fromRGB(255, 255, 255),
+				TextColor3 = ThemeManager.CurrentTheme.TextColor,
 				TextSize = 20,
 				TextTransparency = 0.2,
 				TextXAlignment = Enum.TextXAlignment.Left,
@@ -1366,7 +1703,7 @@ function Library:Window(Data)
 				AutomaticSize = Enum.AutomaticSize.XY,
 				BackgroundTransparency = 1,
 				Text = Data and (Data.Description or Data.Desc) or "Description",
-				TextColor3 = Color3.fromRGB(255, 255, 255),
+				TextColor3 = ThemeManager.CurrentTheme.TextColor,
 				TextSize = 16,
 				TextTransparency = 0.4,
 				TextXAlignment = Enum.TextXAlignment.Left,
@@ -1391,6 +1728,7 @@ function Library:Window(Data)
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,
 				Image = Data and Data.Icon,
+				ImageColor3 = ThemeManager.CurrentTheme.IconColor,
 				ImageTransparency = 0.2,
 				Visible = Data.Section.ShowIcon,
 				Parent = Section,
@@ -1450,7 +1788,7 @@ function Library:Window(Data)
 			local Toggle = Library.New("TextButton", {
 				Name = "Toggle",
 				Size = UDim2.new(0, 50, 0, 24),
-				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+				BackgroundColor3 = ThemeManager.CurrentTheme.AccentColor,
 				BackgroundTransparency = 0.95,
 				BorderSizePixel = 0,
 				Parent = Interaction,
@@ -1466,7 +1804,7 @@ function Library:Window(Data)
 				Position = UDim2.new(0, 2, 0.5, 0),
 				AnchorPoint = Vector2.new(0, 0.5),
 				Size = UDim2.new(0, 20, 0, 20),
-				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+				BackgroundColor3 = ThemeManager.CurrentTheme.AccentColor,
 				BackgroundTransparency = 0.6,
 				BorderSizePixel = 0,
 				Parent = Toggle,
@@ -1482,6 +1820,7 @@ function Library:Window(Data)
 			local AnimateOff = Signal.New()
 
 			local Value = Data.Value or Data.Toggled or false
+			local CallbackOnLoad = Data and Data.CallbackOnLoad or false
 			local Callback = Signal:Callback(Data and Data.Callback)
 
 			AnimateOn:Connect(function()
@@ -1520,7 +1859,10 @@ function Library:Window(Data)
 				)
 			end)
 
-			Callback:Fire(Value)
+			if CallbackOnLoad then
+				Callback:Fire(Value)
+			end
+
 			if Value then
 				AnimateOn:Fire()
 			else
@@ -1607,7 +1949,7 @@ function Library:Window(Data)
 				AutomaticSize = Enum.AutomaticSize.XY,
 				BackgroundTransparency = 1,
 				Text = tostring(Data.Value),
-				TextColor3 = Color3.fromRGB(255, 255, 255),
+				TextColor3 = ThemeManager.CurrentTheme.TextColor,
 				TextSize = 15,
 				TextTransparency = 0.2,
 				TextXAlignment = Enum.TextXAlignment.Center,
@@ -1635,6 +1977,7 @@ function Library:Window(Data)
 			local Percent = Library.New("Frame", {
 				Name = "Percent",
 				Size = UDim2.new(0, 0, 1, 0),
+				BackgroundColor3 = ThemeManager.CurrentTheme.AccentColor,
 				BackgroundTransparency = 0.2,
 				Parent = Slider,
 			})
@@ -1839,24 +2182,24 @@ function Library:Window(Data)
 					Visible = true,
 					ZIndex = 1,
 					LayoutOrder = 1,
-					Position = UDim2.new(0.000, 0, 0.000, 0),
-					Size = UDim2.new(0.000, 30, 0.000, 30),
-					AnchorPoint = Vector2.new(0.000, 0.000),
+					Position = UDim2.new(0, 0, 0, 0),
+					Size = UDim2.new(0, 30, 0, 30),
+					AnchorPoint = Vector2.new(0, 0),
 					AutomaticSize = Enum.AutomaticSize.None,
 					SizeConstraint = Enum.SizeConstraint.RelativeXY,
-					BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+					BackgroundColor3 = ThemeManager.CurrentTheme.AccentColor,
 					BackgroundTransparency = 1,
 					BorderColor3 = Color3.fromRGB(0, 0, 0),
 					BorderSizePixel = 0,
 					BorderMode = Enum.BorderMode.Outline,
 					ClipsDescendants = false,
-					Transparency = 1,
+
 					Parent = Interaction,
 				})
 
 				Library.New("UICorner", {
 					Name = "UICorner",
-					CornerRadius = UDim.new(0.000, 12),
+					CornerRadius = UDim.new(0, 12),
 					Parent = ButtonHolder,
 				})
 
@@ -1866,28 +2209,27 @@ function Library:Window(Data)
 					ZIndex = 1,
 					LayoutOrder = 0,
 					Position = UDim2.new(0.500, 0, 0.500, 0),
-					Size = UDim2.new(0.000, 25, 0.000, 25),
+					Size = UDim2.new(0, 25, 0, 25),
 					AnchorPoint = Vector2.new(0.500, 0.500),
 					AutomaticSize = Enum.AutomaticSize.None,
 					SizeConstraint = Enum.SizeConstraint.RelativeXY,
 					Active = false,
 					Selectable = false,
-					BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+					BackgroundColor3 = ThemeManager.CurrentTheme.AccentColor,
 					BackgroundTransparency = 1,
 					BorderColor3 = Color3.fromRGB(0, 0, 0),
 					BorderSizePixel = 0,
 					BorderMode = Enum.BorderMode.Outline,
 					ClipsDescendants = false,
-					Transparency = 1,
 					Image = Data and (Data.ButtonIcon or Data.HeadingIcon) or "rbxassetid://72922480325213",
-					ImageColor3 = Color3.fromRGB(255, 255, 255),
+					ImageColor3 = ThemeManager.CurrentTheme.IconColor,
 					ImageTransparency = 0.2,
 					ScaleType = Enum.ScaleType.Stretch,
-					SliceCenter = Rect.new(0.000, 0.000, 0.000, 0.000),
+					SliceCenter = Rect.new(0, 0, 0, 0),
 					SliceScale = 1,
 					TileSize = UDim2.new(1.000, 0, 1.000, 0),
-					ImageRectOffset = Vector2.new(0.000, 0.000),
-					ImageRectSize = Vector2.new(0.000, 0.000),
+					ImageRectOffset = Vector2.new(0, 0),
+					ImageRectSize = Vector2.new(0, 0),
 					ResampleMode = Enum.ResamplerMode.Default,
 					Parent = ButtonHolder,
 				})
@@ -1897,17 +2239,17 @@ function Library:Window(Data)
 					Visible = true,
 					ZIndex = 1,
 					LayoutOrder = 0,
-					Position = UDim2.new(0.000, 0, 0.000, 0),
-					Size = UDim2.new(0.000, 0, 0.000, 0),
-					AnchorPoint = Vector2.new(0.000, 0.000),
+					Position = UDim2.new(0, 0, 0, 0),
+					Size = UDim2.new(0, 0, 0, 0),
+					AnchorPoint = Vector2.new(0, 0),
 					AutomaticSize = Enum.AutomaticSize.XY,
-					BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+					BackgroundColor3 = ThemeManager.CurrentTheme.AccentColor,
 					BorderColor3 = Color3.fromRGB(0, 0, 0),
 					BorderSizePixel = 0,
 					ClipsDescendants = false,
 					BackgroundTransparency = 1,
 					Text = Data and (Data.ButtonText or Data.HeadingText) or "Button",
-					TextColor3 = Color3.fromRGB(255, 255, 255),
+					TextColor3 = ThemeManager.CurrentTheme.TextColor,
 					TextSize = 16,
 					TextScaled = false,
 					TextTransparency = 0.6000000238418579,
@@ -1977,7 +2319,7 @@ function Library:Window(Data)
 				AutomaticSize = Enum.AutomaticSize.XY,
 				BackgroundTransparency = 1,
 				Text = "None",
-				TextColor3 = Color3.fromRGB(255, 255, 255),
+				TextColor3 = ThemeManager.CurrentTheme.TextColor,
 				TextSize = 15,
 				TextTransparency = 0.2,
 				TextXAlignment = Enum.TextXAlignment.Left,
@@ -2003,6 +2345,7 @@ function Library:Window(Data)
 					Name = "Icon",
 					Size = UDim2.new(0, 20, 0, 20),
 					LayoutOrder = 1,
+					ImageColor3 = ThemeManager.CurrentTheme.IconColor,
 					BackgroundTransparency = 1,
 					Image = type(Data.DropdownIcon) == "string" and Data.DropdownIcon or "rbxassetid://10709797508",
 					ImageTransparency = 0.2,
@@ -2135,7 +2478,7 @@ function Library:Window(Data)
 					Position = UDim2.fromOffset(X, Y),
 					Size = UDim2.new(0, 175, 0, 0),
 					AutomaticSize = Enum.AutomaticSize.Y,
-					BackgroundColor3 = Color3.fromRGB(9, 9, 9),
+					BackgroundColor3 = ThemeManager.CurrentTheme.BackgroundColor,
 					BackgroundTransparency = 0.1,
 					Parent = ContextMenus,
 					ZIndex = 2,
@@ -2210,7 +2553,7 @@ function Library:Window(Data)
 						AutomaticSize = Enum.AutomaticSize.Y,
 						BackgroundTransparency = 1,
 						Text = String,
-						TextColor3 = Color3.fromRGB(220, 220, 220),
+						TextColor3 = ThemeManager.CurrentTheme.TextColor,
 						TextSize = 16,
 						TextTransparency = 0.2,
 						TextWrapped = true,
@@ -2395,7 +2738,7 @@ function Library:Window(Data)
 				AutomaticSize = Enum.AutomaticSize.XY,
 				BackgroundTransparency = 1,
 				Text = "",
-				TextColor3 = Color3.fromRGB(255, 255, 255),
+				TextColor3 = ThemeManager.CurrentTheme.TextColor,
 				TextSize = 15,
 				TextTransparency = 0.2,
 				TextWrapped = true,
@@ -2545,7 +2888,7 @@ function Library:Window(Data)
 				local Toggle = Library.New("TextButton", {
 					Name = "Toggle",
 					Size = UDim2.new(0, 50, 0, 24),
-					BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+					BackgroundColor3 = ThemeManager.CurrentTheme.AccentColor,
 					BackgroundTransparency = 0.95,
 					BorderSizePixel = 0,
 					Parent = Interaction,
@@ -2561,7 +2904,7 @@ function Library:Window(Data)
 					Position = UDim2.new(0, 2, 0.5, 0),
 					AnchorPoint = Vector2.new(0, 0.5),
 					Size = UDim2.new(0, 20, 0, 20),
-					BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+					BackgroundColor3 = ThemeManager.CurrentTheme.AccentColor,
 					BackgroundTransparency = 0.6,
 					BorderSizePixel = 0,
 					Parent = Toggle,
@@ -2896,7 +3239,7 @@ function Library:Window(Data)
 			Name = "Section",
 			Size = UDim2.new(1, 0, 0, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
-			BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+			BackgroundColor3 = ThemeManager.CurrentTheme.AccentColor,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Parent = Tabs,
@@ -2930,7 +3273,7 @@ function Library:Window(Data)
 			LayoutOrder = 2,
 			AutomaticSize = Enum.AutomaticSize.Y,
 			Text = Data and (Data.Title or Data.Name) or "Section",
-			TextColor3 = Color3.fromRGB(220, 220, 220),
+			TextColor3 = ThemeManager.CurrentTheme.TextColor,
 			Size = UDim2.new(0.75, 0, 0, 0),
 			BackgroundTransparency = 1,
 			TextSize = 16,
@@ -2947,6 +3290,7 @@ function Library:Window(Data)
 			Position = UDim2.new(-0.005, 0, 0, 0),
 			Size = UDim2.new(0, 20, 0, 20),
 			BackgroundTransparency = 1,
+			ImageColor3 = ThemeManager.CurrentTheme.IconColor,
 			Image = Data and (Data.Icon or Data.Image) or "",
 			ImageTransparency = 0.4,
 			Parent = SectionToggle,
@@ -2981,6 +3325,7 @@ function Library:Window(Data)
 			AnchorPoint = Vector2.new(1, 0.5),
 			BackgroundTransparency = 1,
 			Image = "rbxassetid://109320394183701",
+			ImageColor3 = ThemeManager.CurrentTheme.IconColor,
 			ImageTransparency = 0.4,
 			Rotation = 180,
 			Parent = IgnoreLayout,
@@ -3193,6 +3538,7 @@ function Library:Window(Data)
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 1,
 			Image = Data.Icon,
+			ImageColor3 = ThemeManager.CurrentTheme.IconColor,
 			ImageTransparency = 0.4,
 			Parent = Button,
 		})
@@ -3239,7 +3585,7 @@ function Library:Window(Data)
 			Name = "Button",
 			LayoutOrder = Data.Order,
 			Size = UDim2.new(0, 35, 0, 35),
-			BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+			BackgroundColor3 = ThemeManager.CurrentTheme.AccentColor,
 			BackgroundTransparency = 0.95,
 			BorderSizePixel = 0,
 			Text = "",
@@ -3255,6 +3601,7 @@ function Library:Window(Data)
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 1,
 			Image = Data.Icon,
+			ImageColor3 = ThemeManager.CurrentTheme.IconColor,
 			ImageTransparency = 0.4,
 			Parent = InteractionButton,
 		})
@@ -3349,7 +3696,9 @@ function Library:Window(Data)
 
 	Library.InUseOverlay = MainOverlay
 	Minimize:Connect(function()
-		Signal:Assert(Library.InUseOverlay, "No overlay found", "MinimizeLogic")
+		Signal:Assert(Library.InUseOverlay, "No overlay found", "Minimize:Connect")
+		Signal:Assert(Window, "No window found", "Minimize:Connect")
+
 		Library.InUseOverlay.Visible = false
 
 		Signal:Animate(Window, { Time = 0.3, Style = Enum.EasingStyle.Back, Direction = Enum.EasingDirection.In }, {
@@ -3370,6 +3719,8 @@ function Library:Window(Data)
 
 	UnMinimize:Connect(function()
 		Signal:Assert(Library.InUseOverlay, "No overlay found", "MinimizeLogic")
+		Signal:Assert(Window, "No window found", "Minimize:Connect")
+
 		Window.Visible = true
 		Window.BackgroundTransparency = 1
 
@@ -3442,6 +3793,7 @@ function Library:Window(Data)
 			LayoutOrder = 1,
 			Size = UDim2.new(1, 0, 0.15, 0),
 			BackgroundTransparency = Data.Profile.Transparent and 1 or 0.95,
+			BackgroundColor3 = ThemeManager.CurrentTheme.AccentColor,
 			BorderSizePixel = 0,
 			Parent = Sidebar,
 		})
@@ -3493,7 +3845,7 @@ function Library:Window(Data)
 		Library.New("UICorner", { CornerRadius = UDim.new(1, 0), Parent = ProfileIcon })
 		Library.New("UIStroke", {
 			Transparency = 0.9,
-			Color = Color3.fromRGB(255, 255, 255),
+			Color = ThemeManager.CurrentTheme.AccentColor,
 			Parent = ProfileIcon,
 		})
 
@@ -3518,7 +3870,7 @@ function Library:Window(Data)
 			AutomaticSize = Enum.AutomaticSize.XY,
 			BackgroundTransparency = 1,
 			Text = Data.Profile.DisplayAnonym and "Anonymous" or tostring(LocalPlayer.DisplayName),
-			TextColor3 = Color3.fromRGB(255, 255, 255),
+			TextColor3 = ThemeManager.CurrentTheme.TextColor,
 			TextSize = 16,
 			TextTransparency = 0.2,
 			TextXAlignment = Enum.TextXAlignment.Left,
@@ -3532,7 +3884,7 @@ function Library:Window(Data)
 			AutomaticSize = Enum.AutomaticSize.XY,
 			BackgroundTransparency = 1,
 			Text = Data.Profile.UserAnonym and "@Anonymous" or "@" .. tostring(LocalPlayer.Name),
-			TextColor3 = Color3.fromRGB(255, 255, 255),
+			TextColor3 = ThemeManager.CurrentTheme.TextColor,
 			TextSize = 14,
 			TextTransparency = 0.4,
 			TextXAlignment = Enum.TextXAlignment.Left,
@@ -3582,7 +3934,437 @@ function Library:Window(Data)
 	return Controller, Body
 end
 
-function Library:Notify() end
+function Library:Notify(Data)
+	local Notification = Library.New("Frame", {
+		Name = "Notification",
+		ZIndex = 1,
+		LayoutOrder = 0,
+		Position = UDim2.new(1.000, 0, 1.000, 0),
+		Size = UDim2.new(1.000, 0, 0, 0),
+		AnchorPoint = Vector2.new(1.000, 1.000),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundColor3 = ThemeManager.CurrentTheme.AccentColor,
+		BackgroundTransparency = 1,
+		Parent = NotificationZone,
+	})
+
+	local Body = Library.New("TextButton", {
+		Name = "Body",
+		ZIndex = 1,
+		LayoutOrder = 0,
+		Position = UDim2.new(1.5, 0, 0, 0),
+		Size = UDim2.new(1.000, 0, 0, 0),
+		AnchorPoint = Vector2.new(0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundColor3 = ThemeManager.CurrentTheme.BackgroundColor,
+		BackgroundTransparency = 0.10000000149011612,
+		ClipsDescendants = false,
+		Transparency = 0.10000000149011612,
+		Parent = Notification,
+	})
+
+	Library.New("UIPadding", {
+		Name = "UIPadding",
+		PaddingTop = UDim.new(0, 15),
+		PaddingBottom = UDim.new(0, 15),
+		PaddingLeft = UDim.new(0, 15),
+		PaddingRight = UDim.new(0, 15),
+		Parent = Body,
+	})
+
+	local Header = Library.New("Frame", {
+		Name = "Header",
+		Visible = true,
+		ZIndex = 2,
+		LayoutOrder = 0,
+		Position = UDim2.new(0, 0, 0, 0),
+		Size = UDim2.new(1.000, 0, 0, 0),
+		AnchorPoint = Vector2.new(0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		SizeConstraint = Enum.SizeConstraint.RelativeXY,
+		Rotation = 0,
+		Active = false,
+		Selectable = false,
+		BackgroundColor3 = ThemeManager.CurrentTheme.AccentColor,
+		BackgroundTransparency = 1,
+		BorderColor3 = Color3.fromRGB(0, 0, 0),
+		BorderSizePixel = 0,
+		BorderMode = Enum.BorderMode.Outline,
+		ClipsDescendants = false,
+		Parent = Body,
+	})
+
+	Library.New("TextLabel", {
+		Name = "Title",
+		ZIndex = 1,
+		LayoutOrder = 1,
+		Position = UDim2.new(0, 0, 0, 0),
+		Size = UDim2.new(0.800, 0, 0, 0),
+		AnchorPoint = Vector2.new(0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundColor3 = ThemeManager.CurrentTheme.AccentColor,
+		BackgroundTransparency = 1,
+		ClipsDescendants = false,
+		Text = Data and Data.Title or "Title",
+		TextColor3 = ThemeManager.CurrentTheme.TextColor,
+		TextSize = 20,
+		TextScaled = false,
+		TextTransparency = 0.2,
+		TextWrapped = true,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Center,
+		FontFace = Font.new("rbxassetid://16658221428", Enum.FontWeight.Medium, Enum.FontStyle.Normal),
+		Parent = Header,
+	})
+
+	Library.New("UIListLayout", {
+		Name = "UIListLayout",
+		FillDirection = Enum.FillDirection.Horizontal,
+		HorizontalAlignment = Enum.HorizontalAlignment.Left,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, 6),
+		ItemLineAlignment = Enum.ItemLineAlignment.Automatic,
+		Parent = Header,
+	})
+
+	if Data.Icon then
+		local Icon = Library.New("ImageLabel", {
+			Name = "Icon",
+			Visible = true,
+			ZIndex = 1,
+			LayoutOrder = 0,
+			Position = UDim2.new(-0.005, 0, 0, 0),
+			Size = UDim2.new(0, 22, 0, 22),
+			AnchorPoint = Vector2.new(0, 0),
+			AutomaticSize = Enum.AutomaticSize.None,
+			BackgroundColor3 = ThemeManager.CurrentTheme.AccentColor,
+			BackgroundTransparency = 1,
+			Image = Data.Icon,
+			ImageColor3 = ThemeManager.CurrentTheme.IconColor,
+			ImageTransparency = 0.20000000298023224,
+			Parent = Header,
+		})
+
+		Signal:Track(Icon)
+	end
+
+	local IgnoreLayout = Library.New("Folder", { Name = "IgnoreLayout", Parent = Header })
+
+	local Content = Library.New("Frame", {
+		Name = "Content",
+		ZIndex = 2,
+		LayoutOrder = 2,
+		Position = UDim2.new(0, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		Size = UDim2.new(1.000, 0, 0, 0),
+		AnchorPoint = Vector2.new(0, 0),
+		BackgroundColor3 = ThemeManager.CurrentTheme.AccentColor,
+		BackgroundTransparency = 1,
+		Parent = Body,
+	})
+
+	local ContentText = Library.New("TextLabel", {
+		Name = "ContentText",
+		ZIndex = 1,
+		LayoutOrder = 0,
+		Position = UDim2.new(0, 0, 0, 0),
+		Size = UDim2.new(1.000, 0, 0, 0),
+		AnchorPoint = Vector2.new(0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundColor3 = ThemeManager.CurrentTheme.AccentColor,
+		BackgroundTransparency = 1,
+		Text = Data and Data.Content or "",
+		TextColor3 = ThemeManager.CurrentTheme.TextColor,
+		TextSize = 16,
+		TextTransparency = 0.4000000059604645,
+		TextWrapped = true,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Center,
+		FontFace = Font.new("rbxassetid://16658221428", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
+		Parent = Content,
+	})
+
+	Signal:Track(ContentText)
+
+	Library.New("UIListLayout", {
+		Name = "UIListLayout",
+		FillDirection = Enum.FillDirection.Vertical,
+		HorizontalAlignment = Enum.HorizontalAlignment.Left,
+		VerticalAlignment = Enum.VerticalAlignment.Top,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, 0),
+		ItemLineAlignment = Enum.ItemLineAlignment.Automatic,
+		Parent = Content,
+	})
+
+	Library.New("UIListLayout", {
+		Name = "UIListLayout",
+		FillDirection = Enum.FillDirection.Vertical,
+		HorizontalAlignment = Enum.HorizontalAlignment.Left,
+		VerticalAlignment = Enum.VerticalAlignment.Top,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, 6),
+		ItemLineAlignment = Enum.ItemLineAlignment.Automatic,
+		Parent = Body,
+	})
+
+	Library.New("UICorner", {
+		Name = "UICorner",
+		CornerRadius = UDim.new(0, 15),
+		Parent = Body,
+	})
+
+	if Data and (Data.Background or Data.BackgroundImage) then
+		local IgnoreLayout_1 = Library.New("Folder", {
+			Name = "IgnoreLayout",
+			Parent = Body,
+		})
+
+		local BackgroundImage = Library.New("ImageLabel", {
+			Name = "BackgroundImage",
+			ZIndex = 1,
+			LayoutOrder = 0,
+			Position = UDim2.new(0.500, 0, 0.500, 0),
+			Size = UDim2.new(1.000, 30, 1.000, 30),
+			AnchorPoint = Vector2.new(0.500, 0.500),
+			BackgroundTransparency = 1,
+			Image = Data and (Data.Background or Data.BackgroundImage),
+			ImageTransparency = 0.800000011920929,
+			Parent = IgnoreLayout_1,
+		})
+
+		Library.New("UICorner", {
+			Name = "UICorner",
+			CornerRadius = UDim.new(0, 15),
+			Parent = BackgroundImage,
+		})
+	end
+
+	if Data.Buttons and #Data.Buttons > 0 then
+		local ButtonLayout = Library.New("Frame", {
+			Name = "ButtonLayout",
+			Visible = true,
+			ZIndex = 2,
+			LayoutOrder = 3,
+			Position = UDim2.new(-0.004, 0, 0.987, 0),
+			Size = UDim2.new(1.000, 0, 0, 35),
+			AnchorPoint = Vector2.new(0, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundColor3 = ThemeManager.CurrentTheme.AccentColor,
+			BackgroundTransparency = 1,
+			ClipsDescendants = false,
+			Parent = Body,
+		})
+
+		local Buttons = Library.New("ScrollingFrame", {
+			Name = "Buttons",
+			ZIndex = 1,
+			LayoutOrder = 0,
+			Position = UDim2.new(0, 0, 0, 0),
+			Size = UDim2.new(1.000, 0, 1.000, 0),
+			AnchorPoint = Vector2.new(0, 0),
+			BackgroundTransparency = 1,
+			BorderColor3 = Color3.fromRGB(0, 0, 0),
+			BorderSizePixel = 0,
+			BorderMode = Enum.BorderMode.Outline,
+			CanvasSize = UDim2.new(0, 0, 0, 0),
+			AutomaticCanvasSize = Enum.AutomaticSize.X,
+			ClipsDescendants = true,
+			ScrollBarThickness = 0,
+			ScrollBarImageColor3 = Color3.fromRGB(0, 0, 0),
+			ScrollBarImageTransparency = 1,
+			ScrollingDirection = Enum.ScrollingDirection.X,
+			ScrollingEnabled = true,
+			Parent = ButtonLayout,
+		})
+
+		for Index, Value in ipairs(Data.Buttons) do
+			local NotificationButton = Library.New("TextButton", {
+				Name = "NotificationButton",
+				ZIndex = 1,
+				LayoutOrder = 1,
+				Position = UDim2.new(0, 0, 0, 0),
+				Size = UDim2.new(0, 0, 0, 0),
+				AnchorPoint = Vector2.new(0, 0),
+				AutomaticSize = Enum.AutomaticSize.XY,
+				BackgroundColor3 = ThemeManager.CurrentTheme.AccentColor,
+				BackgroundTransparency = 0.949999988079071,
+				BorderColor3 = Color3.fromRGB(0, 0, 0),
+				Transparency = 0.949999988079071,
+				Parent = Buttons,
+			})
+
+			Library.New("UICorner", {
+				Name = "UICorner",
+				CornerRadius = UDim.new(0, 8),
+				Parent = NotificationButton,
+			})
+
+			Library.New("UIPadding", {
+				Name = "UIPadding",
+				PaddingTop = UDim.new(0, 9),
+				PaddingBottom = UDim.new(0, 9),
+				PaddingLeft = UDim.new(0, 9),
+				PaddingRight = UDim.new(0, 9),
+				Parent = NotificationButton,
+			})
+
+			Library.New("TextLabel", {
+				Name = "ActionText",
+				ZIndex = 1,
+				LayoutOrder = 0,
+				Position = UDim2.new(-0.001, 0, 0.188, 0),
+				Size = UDim2.new(0, 0, 0, 0),
+				AnchorPoint = Vector2.new(0, 0),
+				BackgroundColor3 = ThemeManager.CurrentTheme.AccentColor,
+				BackgroundTransparency = 1,
+				Text = Value.Title or "Action",
+				AutomaticSize = Enum.AutomaticSize.XY,
+				TextColor3 = ThemeManager.CurrentTheme.TextColor,
+				TextSize = 15,
+				TextScaled = false,
+				TextTransparency = 0.2,
+				TextWrapped = true,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextYAlignment = Enum.TextYAlignment.Center,
+				FontFace = Font.new("rbxassetid://16658221428", Enum.FontWeight.SemiBold, Enum.FontStyle.Normal),
+				Parent = NotificationButton,
+			})
+
+			Library.New("UIListLayout", {
+				Name = "UIListLayout",
+				FillDirection = Enum.FillDirection.Horizontal,
+				HorizontalAlignment = Enum.HorizontalAlignment.Left,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 4),
+				ItemLineAlignment = Enum.ItemLineAlignment.Automatic,
+				Parent = NotificationButton,
+			})
+
+			Library.New("UIListLayout", {
+				Name = "UIListLayout",
+				FillDirection = Enum.FillDirection.Horizontal,
+				HorizontalAlignment = Enum.HorizontalAlignment.Left,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 6),
+				ItemLineAlignment = Enum.ItemLineAlignment.Automatic,
+				Parent = Buttons,
+			})
+
+			NotificationButton.MouseEnter:Connect(function()
+				Signal:Animate(
+					NotificationButton,
+					{ Time = 0.25, Style = Enum.EasingStyle.Sine, Direction = Enum.EasingDirection.Out },
+					{ BackgroundTransparency = 0.9 }
+				)
+			end)
+
+			NotificationButton.MouseLeave:Connect(function()
+				Signal:Animate(
+					NotificationButton,
+					{ Time = 0.25, Style = Enum.EasingStyle.Sine, Direction = Enum.EasingDirection.Out },
+					{ BackgroundTransparency = 0.95 }
+				)
+			end)
+
+			local Callback = Signal:Callback(Value.Callback)
+
+			NotificationButton.MouseButton1Click:Connect(function()
+				if Value.DestroyOnClick then
+					RemoveFromQueue:Fire(Notification)
+					return
+				end
+
+				Callback:Fire()
+			end)
+		end
+	end
+
+	Body.MouseEnter:Connect(function()
+		Signal:Animate(
+			Body,
+			{ Time = 0.25, Style = Enum.EasingStyle.Sine, Direction = Enum.EasingDirection.Out },
+			{ BackgroundTransparency = 0.2 }
+		)
+	end)
+
+	Body.MouseLeave:Connect(function()
+		Signal:Animate(
+			Body,
+			{ Time = 0.25, Style = Enum.EasingStyle.Sine, Direction = Enum.EasingDirection.Out },
+			{ BackgroundTransparency = 0.1 }
+		)
+	end)
+
+	local Duration = Data and Data.Duration or 3
+	local CloseType = Data and Data.CloseType or "Body Click"
+
+	Body.MouseEnter:Connect(function()
+		Signal:Animate(
+			Body,
+			{ Time = 0.25, Style = Enum.EasingStyle.Sine, Direction = Enum.EasingDirection.Out },
+			{ BackgroundTransparency = 0.2 }
+		)
+	end)
+
+	Body.MouseLeave:Connect(function()
+		Signal:Animate(
+			Body,
+			{ Time = 0.25, Style = Enum.EasingStyle.Sine, Direction = Enum.EasingDirection.Out },
+			{ BackgroundTransparency = 0.1 }
+		)
+	end)
+
+	if CloseType == "Button" then
+		local Close = Library.New("ImageButton", {
+			Name = "CloseIcon",
+			ZIndex = 1,
+			LayoutOrder = 5,
+			Position = UDim2.new(1.000, 0, 0.500, 0),
+			Size = UDim2.new(0, 16, 0, 16),
+			AnchorPoint = Vector2.new(1.000, 0.500),
+			BackgroundColor3 = ThemeManager.CurrentTheme.AccentColor,
+			BackgroundTransparency = 1,
+			Image = "rbxassetid://111236849679728",
+			ImageColor3 = ThemeManager.CurrentTheme.IconColor,
+			ImageTransparency = 0.5,
+			Parent = IgnoreLayout,
+		})
+
+		Close.MouseButton1Click:Connect(function()
+			RemoveFromQueue:Fire(Notification)
+		end)
+
+		Close.MouseEnter:Connect(function()
+			Signal:Animate(
+				Close,
+				{ Time = 0.25, Style = Enum.EasingStyle.Sine, Direction = Enum.EasingDirection.Out },
+				{ ImageTransparency = 0.2 }
+			)
+		end)
+
+		Close.MouseLeave:Connect(function()
+			Signal:Animate(
+				Close,
+				{ Time = 0.25, Style = Enum.EasingStyle.Sine, Direction = Enum.EasingDirection.Out },
+				{ ImageTransparency = 0.5 }
+			)
+		end)
+	else
+		Body.MouseButton1Click:Connect(function()
+			RemoveFromQueue:Fire(Notification)
+		end)
+	end
+
+	AddToQueue:Fire(Notification)
+
+	task.delay(Duration, function()
+		RemoveFromQueue:Fire(Notification)
+	end)
+end
 
 OnDestroy:Connect(function()
 	Signal:DisconnectAll()
