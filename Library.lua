@@ -2311,6 +2311,7 @@ function Library:Window(Data)
 				Size = UDim2.new(0, 0, 0, 35),
 				AutomaticSize = Enum.AutomaticSize.X,
 				BackgroundTransparency = 0.95,
+				Role = "Accent",
 				LayoutOrder = 1,
 				Parent = Interaction,
 			}) :: Frame
