@@ -4121,7 +4121,7 @@ function Library:Notify(Data)
 		Parent = Content,
 	})
 
-	Signal:Track(ContentText)
+	Signal:Track(ContentText, Content)
 
 	Library.New("UIListLayout", {
 		Name = "UIListLayout",
