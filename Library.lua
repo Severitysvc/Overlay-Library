@@ -1093,7 +1093,7 @@ AddToQueue:Connect(function(Notification)
 end)
 
 RemoveFromQueue:Connect(function(Notification)
-	Signal:Assert(Notification and Notification.Body, "Argument is nil and/or no body was found", "RemoveFromQueue")
+	Signal:Assert(Notification and Notification:FindFirstChildOfClass("TextButton"), "Argument is nil and/or no body was found", "RemoveFromQueue")
 
 	local Body = Notification:FindFirstChildOfClass("TextButton")
 	local StackSizeY = 0
