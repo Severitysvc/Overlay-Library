@@ -126,7 +126,15 @@ function Signal:MatchInput(Input, ...)
 end
 
 function Signal:Animate(Object, Info, Propriety)
-	local TweenInfo = TweenInfo.new(Info.Time, Info.Style, Info.Direction)
+	local TweenInfo = TweenInfo.new(
+		Info.Time,
+		Info.Style,
+		Info.Direction,
+		Info.RepeatCount or 0,
+		Info.Reverses or false,
+		Info.DelayTime or 0
+	)
+
 	local Animation = TweenService:Create(Object, TweenInfo, Propriety)
 	Animation:Play()
 
@@ -360,7 +368,7 @@ function Library.New(Class, Properties)
 				Object[Property] = Value
 			end)
 
-			if not SetSuccess then
+			if not SetSuccess and Property ~= "Ignore" then
 				warn("Failed to set property: " .. tostring(Property))
 			end
 		end
@@ -368,10 +376,12 @@ function Library.New(Class, Properties)
 		if Role then
 			Object:SetAttribute("Role", Role)
 		else
-			if Class == "TextLabel" then
-				Object:SetAttribute("Role", "Text")
-			elseif Class == "ImageLabel" or Class == "ImageButton" then
-				Object:SetAttribute("Role", "Icon")
+			if not Properties.Ignore then
+				if Class == "TextLabel" then
+					Object:SetAttribute("Role", "Text")
+				elseif Class == "ImageLabel" or Class == "ImageButton" then
+					Object:SetAttribute("Role", "Icon")
+				end
 			end
 		end
 	end
@@ -748,7 +758,7 @@ end
 
 function Library:SetTheme(Theme)
 	local SelectedTheme = ThemeManager.Themes[Theme]
-	Signal:Assert(SelectedTheme, "Theme: " .. Theme .. " Does not exist", "Library:SetTheme")
+	--//Signal:Assert(SelectedTheme, "Theme: " .. Theme .. " Does not exist", "Library:SetTheme")
 
 	if SelectedTheme then
 		ThemeManager.CurrentTheme = SelectedTheme
@@ -770,6 +780,242 @@ function Library:CreateTheme(Data)
 	return Theme
 end
 
+--// Background Animations
+function Library.SetupAnimation(Animation, Window, Data)
+	Signal:Assert(
+		Animation and type(Animation) == "string",
+		"Animation is nil and/or is not a string",
+		"Library.SetupAnimation"
+	)
+
+	--[[
+		// Creditx:
+		//	Parallax:= https://matthew.wagerfield.com/parallax/
+		//	Parallax Github Orientation: https://github.com/wagerfield/parallax
+	]]
+
+	if Animation == "Parallax" then
+		local Config = {
+			LightHouse = {
+				Angle = Data.LightHouseAngle or 5,
+				Speed = Data.LightHouseSpeed or 1,
+				BobAmplitude = Data.LightHouseBobAmplitude or 0.008,
+				BobMultipliers = Data.LightHouseBobMultipliers or { 1, 1 },
+				TiltMultipliers = Data.LightHouseTiltMultipliers or { 1, 1 },
+				PhaseStep = math.pi,
+				TiltPhaseOffset = (math.pi / 4),
+				X = Data.LightHouseXPositions or { 0.15, 0.75 },
+				Y = Data.LightHouseYPosition or 0.9,
+			},
+
+			Wave = {
+				Amplitude = Data.WaveAmplitude or 0.04,
+				AmplitudeStep = Data.WaveAmplitudeStep or 0.1,
+				BaseSpeed = Data.WaveBaseSpeed or 0.9,
+				SpeedStep = Data.WaveSpeedStep or 0.4,
+				PhaseStep = ((2 * math.pi) / 3),
+				Height = Data.WaveHeight or 0.2,
+			},
+		}
+
+		local Background = Library.New("ImageLabel", {
+			Name = "Background",
+			Visible = true,
+			ZIndex = -1,
+			Position = UDim2.new(0.000, 0, 0.000, 0),
+			Size = UDim2.new(1.000, 0, 1.000, 0),
+			AnchorPoint = Vector2.new(0.000, 0.000),
+			BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+			BackgroundTransparency = 0,
+			ClipsDescendants = false,
+			Transparency = 0,
+			Image = "rbxassetid://88713227769730",
+			ImageColor3 = Color3.fromRGB(255, 255, 255),
+			Ignore = true,
+			ImageTransparency = 0,
+			Parent = Window,
+		})
+
+		Library.New("UICorner", {
+			Name = "UICorner",
+			CornerRadius = UDim.new(0.000, 15),
+			Parent = Background,
+		})
+
+		local Wave = Library.New("ImageLabel", {
+			Name = "Wave",
+			Visible = true,
+			ZIndex = 1,
+			Position = UDim2.new(0.000, 0, 1.000, 0),
+			Size = UDim2.new(1.000, 0, Config.Wave.Height, 0),
+			AnchorPoint = Vector2.new(0.000, 1.000),
+			BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+			BackgroundTransparency = 1,
+			ClipsDescendants = false,
+			Transparency = 1,
+			Image = "rbxassetid://75039717310710",
+			ImageColor3 = Color3.fromRGB(255, 255, 255),
+			ImageTransparency = 0,
+			ScaleType = Enum.ScaleType.Tile,
+			SliceScale = 1,
+			TileSize = UDim2.new(0.500, 0, 1.000, 0),
+			Ignore = true,
+			Parent = Window,
+		})
+
+		Library.New("UICorner", {
+			Name = "UICorner",
+			CornerRadius = UDim.new(0.000, 15),
+			Parent = Wave,
+		})
+
+		local LightHouse = Library.New("ImageLabel", {
+			Name = "LightHouse",
+			Visible = true,
+			ZIndex = -1,
+			LayoutOrder = 0,
+			Position = UDim2.new(Config.LightHouse.X[1], 0, Config.LightHouse.Y, 0),
+			Size = UDim2.new(0.000, 120, 0.000, 185),
+			AnchorPoint = Vector2.new(0.000, 1.000),
+			BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+			BackgroundTransparency = 1,
+			ClipsDescendants = false,
+			Transparency = 1,
+			Image = "rbxassetid://90519913198907",
+			ImageColor3 = Color3.fromRGB(255, 255, 255),
+			ImageTransparency = 0,
+			Ignore = true,
+			Parent = Window,
+		})
+
+		local SecondWave = Wave:Clone()
+		local ThirdWave = Wave:Clone()
+
+		SecondWave.ZIndex = 0
+		ThirdWave.ZIndex = -1
+
+		SecondWave.Parent = Window
+		ThirdWave.Parent = Window
+
+		local SecondLightHouse = LightHouse:Clone()
+		SecondLightHouse.Position = UDim2.new(Config.LightHouse.X[2], 0, Config.LightHouse.Y, 0)
+		SecondLightHouse.Parent = Window
+
+		local WaveList = { Wave, SecondWave, ThirdWave }
+		local LightHouseList = { LightHouse, SecondLightHouse }
+
+		for Index, Instance in ipairs(WaveList) do
+			local Speed = Config.Wave.BaseSpeed + (Index - 1) * Config.Wave.SpeedStep
+			local Amplitude = (
+				Config.Wave.Amplitude + (Index - 1) * (Config.Wave.Amplitude * Config.Wave.AmplitudeStep)
+			) * 0.5
+
+			local TileStretch = 0.35 + (Index * 0.1)
+			Instance.TileSize = UDim2.new(TileStretch, 0, 1, 0)
+
+			local Duration = math.pi / Speed
+			local BaseSize = Instance.Size
+
+			Instance.Size =
+				UDim2.new(BaseSize.X.Scale, BaseSize.X.Offset, BaseSize.Y.Scale - Amplitude, BaseSize.Y.Offset)
+			local Phase = (Index - 1) * Config.Wave.PhaseStep
+			local StartDelay = Phase / Speed
+
+			task.delay(StartDelay, function()
+				Signal:Animate(Instance, {
+					Time = Duration,
+					Style = Enum.EasingStyle.Sine,
+					Direction = Enum.EasingDirection.InOut,
+					RepeatCount = -1,
+					Reverses = true,
+					DelayTime = 0,
+				}, {
+					Size = UDim2.new(
+						BaseSize.X.Scale,
+						BaseSize.X.Offset,
+						BaseSize.Y.Scale + Amplitude,
+						BaseSize.Y.Offset
+					),
+				})
+			end)
+		end
+
+		for Index, Instance in ipairs(LightHouseList) do
+			local BobMultiplier = Config.LightHouse.BobMultipliers[Index]
+				or Config.LightHouse.BobMultipliers[#Config.LightHouse.BobMultipliers]
+
+			local TiltMultiplier = Config.LightHouse.TiltMultipliers[Index]
+				or Config.LightHouse.TiltMultipliers[#Config.LightHouse.TiltMultipliers]
+
+			local BobSpeed = Config.LightHouse.Speed * BobMultiplier
+			local BobAmplitude = Config.LightHouse.BobAmplitude * BobMultiplier
+			local BobDuration = math.pi / BobSpeed
+
+			local TiltSpeed = Config.LightHouse.Speed * TiltMultiplier
+			local TiltAmplitude = Config.LightHouse.Angle * TiltMultiplier
+			local TiltDuration = math.pi / TiltSpeed
+
+			local BasePosition = Instance.Position
+
+			Instance.Position = UDim2.new(
+				BasePosition.X.Scale,
+				BasePosition.X.Offset,
+				BasePosition.Y.Scale - BobAmplitude,
+				BasePosition.Y.Offset
+			)
+
+			Instance.Rotation = -TiltAmplitude
+
+			local BobPhase = (Index - 1) * Config.LightHouse.PhaseStep
+			local TiltPhase = (Index - 1) * Config.LightHouse.PhaseStep + Config.LightHouse.TiltPhaseOffset
+
+			task.delay(BobPhase / BobSpeed, function()
+				Signal:Animate(Instance, {
+					Time = BobDuration,
+					Style = Enum.EasingStyle.Sine,
+					Direction = Enum.EasingDirection.InOut,
+					RepeatCount = -1,
+					Reverses = true,
+					DelayTime = 0,
+				}, {
+					Position = UDim2.new(
+						BasePosition.X.Scale,
+						BasePosition.X.Offset,
+						BasePosition.Y.Scale + BobAmplitude,
+						BasePosition.Y.Offset
+					),
+				})
+			end)
+
+			task.delay(TiltPhase / TiltSpeed, function()
+				Signal:Animate(Instance, {
+					Time = TiltDuration,
+					Style = Enum.EasingStyle.Sine,
+					Direction = Enum.EasingDirection.InOut,
+					RepeatCount = -1,
+					Reverses = true,
+					DelayTime = 0,
+				}, { Rotation = TiltAmplitude })
+			end)
+		end
+
+		return {
+			Unload = function()
+				Background:Destroy()
+
+				for _, Wave in ipairs(WaveList) do
+					Wave:Destroy()
+				end
+
+				for _, LightHouse in ipairs(LightHouseList) do
+					LightHouse:Destroy()
+				end
+			end
+		}
+	end
+
+	return nil
+end
 --// UI
 local OnDestroy = Signal.New()
 Global.OverlayDestroy = OnDestroy
@@ -990,9 +1236,9 @@ function Library:Window(Data)
 		ClipsDescendants = false,
 		Transparency = 0.9,
 		Parent = IgnoreLayout,
+		Ignore = true,
 	})
 
-	DragBar:SetAttribute("Ignore", true)
 	local DragMechanic = Library.SetDraggable(Window, DragBar)
 	local DragHover = false
 
@@ -1057,36 +1303,6 @@ function Library:Window(Data)
 		Parent = Window,
 	})
 
-	local TopRight = Library.New("ImageLabel", {
-		Name = "TopRight",
-		ZIndex = -1,
-		Position = UDim2.new(0, 1, 0, -1),
-		Size = UDim2.new(1, 0, 1, 0),
-		BackgroundTransparency = 1,
-		BorderSizePixel = 0,
-		Image = "rbxassetid://136612025197923",
-		ImageColor3 = Color3.fromRGB(255, 0, 0),
-		ImageTransparency = 1,
-		Parent = IgnoreLayout,
-	})
-
-	Library.New("UICorner", { CornerRadius = UDim.new(0, 15), Parent = TopRight })
-
-	local TopLeft = Library.New("ImageLabel", {
-		Name = "TopLeft",
-		ZIndex = -1,
-		Position = UDim2.new(0, -1, 0, -1),
-		Size = UDim2.new(1, 0, 1, 0),
-		BackgroundTransparency = 1,
-		BorderSizePixel = 0,
-		Image = "rbxassetid://90085857557952",
-		ImageColor3 = Color3.fromRGB(158, 1, 255),
-		ImageTransparency = 1,
-		Parent = IgnoreLayout,
-	})
-
-	Library.New("UICorner", { CornerRadius = UDim.new(0, 15), Parent = TopLeft })
-
 	local BackgroundImage = Library.New("ImageLabel", {
 		Name = "BackgroundImage",
 		ZIndex = -1,
@@ -1099,12 +1315,87 @@ function Library:Window(Data)
 		Role = "Icon",
 		ImageTransparency = 0.9,
 		ScaleType = Enum.ScaleType.Crop,
+		Ignore = true,
 		Parent = IgnoreLayout,
 	}) :: ImageLabel
 
-	BackgroundImage:SetAttribute("Ignore", true)
 	Signal:Track(BackgroundImage)
+
 	Library.New("UICorner", { CornerRadius = UDim.new(0, 15), Parent = BackgroundImage })
+
+	if Data.ImageCorners then
+		if Data.ImageCorners.TopLeft then
+			local TopLeft = Library.New("ImageLabel", {
+				Name = "TopLeft",
+				ZIndex = 1,
+				Position = UDim2.new(0, -1, 0, -1),
+				Size = UDim2.new(1, 0, 1, 0),
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				Image = "rbxassetid://90085857557952",
+				ImageColor3 = Data.ImageCorners.TopLeft.Color or Color3.fromRGB(255, 255, 255),
+				ImageTransparency = Data.ImageCorners.TopLeft.Transparency or 0.9,
+				Parent = IgnoreLayout,
+				Ignore = true,
+			})
+
+			Library.New("UICorner", { CornerRadius = UDim.new(0, 15), Parent = TopLeft })
+		end
+
+		if Data.ImageCorners.TopRight then
+			local TopRight = Library.New("ImageLabel", {
+				Name = "TopRight",
+				ZIndex = 1,
+				Position = UDim2.new(0, 1, 0, -1),
+				Size = UDim2.new(1, 0, 1, 0),
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				Image = "rbxassetid://136612025197923",
+				ImageColor3 = Data.ImageCorners.TopRight.Color or Color3.fromRGB(255, 255, 255),
+				ImageTransparency = Data.ImageCorners.TopRight.Transparency or 0.9,
+				Parent = IgnoreLayout,
+				Ignore = true,
+			})
+
+			Library.New("UICorner", { CornerRadius = UDim.new(0, 15), Parent = TopRight })
+		end
+
+		if Data.ImageCorners.DownLeft then
+			local DownLeft = Library.New("ImageLabel", {
+				Name = "DownLeft",
+				ZIndex = 1,
+				Position = UDim2.new(0, 1, 0, 1),
+				Size = UDim2.new(1, 0, 1, 0),
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				Image = "rbxassetid://80706260659632",
+				ImageColor3 = Data.ImageCorners.DownLeft.Color or Color3.fromRGB(255, 255, 255),
+				ImageTransparency = Data.ImageCorners.DownLeft.Transparency or 0.9,
+				Parent = IgnoreLayout,
+				Ignore = true,
+			})
+
+			Library.New("UICorner", { CornerRadius = UDim.new(0, 15), Parent = DownLeft })
+		end
+
+		if Data.ImageCorners.DownRight then
+			local DownRight = Library.New("ImageLabel", {
+				Name = "DownRight",
+				ZIndex = 1,
+				Position = UDim2.new(0, 1, 0, 1),
+				Size = UDim2.new(1, 0, 1, 0),
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				Image = "rbxassetid://117215442732435",
+				ImageColor3 = Data.ImageCorners.DownRight.Color or Color3.fromRGB(255, 255, 255),
+				ImageTransparency = Data.ImageCorners.DownRight.Transparency or 0.9,
+				Parent = IgnoreLayout,
+				Ignore = true,
+			})
+
+			Library.New("UICorner", { CornerRadius = UDim.new(0, 15), Parent = DownRight })
+		end
+	end
 
 	local MainOverlay = Library.New("Frame", {
 		Name = "MainOverlay",
@@ -1112,6 +1403,7 @@ function Library:Window(Data)
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		Parent = Window,
+		ZIndex = 5,
 	})
 
 	Library.New("UIListLayout", {
@@ -1119,7 +1411,7 @@ function Library:Window(Data)
 		SortOrder = Enum.SortOrder.LayoutOrder,
 		HorizontalFlex = Enum.UIFlexAlignment.Fill,
 		Wraps = true,
-		Parent = Window,
+		Parent = MainOverlay,
 	})
 
 	local Sidebar = Library.New("Frame", {
@@ -2485,8 +2777,13 @@ function Library:Window(Data)
 				local Y = AbsolutePosition.Y + AbsoluteSize.Y + 60
 
 				local InputConnection
+				local Children = 0
 
-				local ContextMenu = Library.New("Frame", {
+				for _, Child in pairs(Data) do
+					Children = Children + 1
+				end
+
+				local ContextMenu = Library.New(Children < 8 and "Frame" or "ScrollingFrame", {
 					Name = "ContextMenu",
 					Visible = true,
 					Position = UDim2.fromOffset(X, Y),
@@ -2496,6 +2793,16 @@ function Library:Window(Data)
 					BackgroundTransparency = ThemeManager.CurrentTheme.BackgroundTransparency,
 					Parent = ContextMenus,
 					ZIndex = 2,
+				})
+
+				Library.New("UIListLayout", { Padding = UDim.new(0, 3), Parent = ContextMenu })
+
+				Library.New("UIPadding", {
+					PaddingTop = UDim.new(0, 6),
+					PaddingBottom = UDim.new(0, 6),
+					PaddingLeft = UDim.new(0, 6),
+					PaddingRight = UDim.new(0, 6),
+					Parent = ContextMenu,
 				})
 
 				InputConnection = UserInputService.InputBegan:Connect(function(Input)
@@ -2546,12 +2853,23 @@ function Library:Window(Data)
 					ContextMenu:Destroy()
 				end)
 
-				for _, String in Data do
+				if Children >= 8 then
+					ContextMenu.CanvasSize = UDim2.new(0, 0, 0, 0)
+					ContextMenu.AutomaticCanvasSize = Enum.AutomaticSize.None
+					ContextMenu.ScrollBarThickness = 0
+					ContextMenu.AutomaticCanvasSize = Enum.AutomaticSize.Y
+					ContextMenu.AutomaticSize = Enum.AutomaticSize.None
+
+					ContextMenu.Size = UDim2.fromOffset(175, 305)
+				end
+
+				for _, String in ipairs(Data) do
 					local ValueButton = Library.New("TextButton", {
 						Name = String,
 						Position = UDim2.new(0.075, 0, 0, 0),
 						Size = UDim2.new(1, 0, 0, 0),
 						AutomaticSize = Enum.AutomaticSize.Y,
+						Role = "Accent",
 						BackgroundTransparency = 1,
 						Text = "",
 						Visible = false,
@@ -2586,15 +2904,6 @@ function Library:Window(Data)
 					})
 
 					Library.New("UICorner", { CornerRadius = UDim.new(0, 12), Parent = ValueButton })
-					Library.New("UIListLayout", { Padding = UDim.new(0, 3), Parent = ContextMenu })
-
-					Library.New("UIPadding", {
-						PaddingTop = UDim.new(0, 6),
-						PaddingBottom = UDim.new(0, 6),
-						PaddingLeft = UDim.new(0, 6),
-						PaddingRight = UDim.new(0, 6),
-						Parent = ContextMenu,
-					})
 
 					local Size = ValueButton.AbsoluteSize.Y
 					ValueButton.AutomaticSize = Enum.AutomaticSize.None
@@ -3715,6 +4024,18 @@ function Library:Window(Data)
 		OnDestroy:Fire()
 	end
 
+	--// Animations
+	function Controller:LoadAnimation(Animation, Data)
+		Controller.LoadedAnimation = Library.SetupAnimation(Animation, IgnoreLayout, Data)
+		BackgroundImage.Visible = false
+	end
+
+	function Controller:UnloadAnimation()
+		Signal:Assert(Controller.LoadedAnimation, "No loaded animation", ":UnloadAnimation")
+		Controller.LoadedAnimation:Unload()
+		BackgroundImage.Visible = true
+	end
+
 	do --// Topbar Buttons
 		Controller:NewTopbarButton({ --// Close
 			Order = 999,
@@ -3787,10 +4108,9 @@ function Library:Window(Data)
 					Enum.ThumbnailType.HeadShot,
 					Enum.ThumbnailSize.Size420x420
 				),
+			Ignore = true,
 			Parent = Profile,
 		})
-
-		ProfileIcon:SetAttribute("Ignore", true)
 
 		Library.New("UICorner", { CornerRadius = UDim.new(1, 0), Parent = ProfileIcon })
 		Library.New("UIStroke", {
