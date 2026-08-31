@@ -443,7 +443,7 @@ function Library.SetupCommonElementBody(Data)
 		Parent = ElementBody,
 	})
 
-	Library.New("UICorner", { CornerRadius = UDim.new(0, 15), Parent = ElementBody })
+	Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.High), Parent = ElementBody })
 
 	Library.New("UIPadding", {
 		PaddingTop = UDim.new(0, 12),
@@ -490,7 +490,7 @@ function Library.SetupCommonElementBody(Data)
 		Parent = Header,
 	})
 
-	Library.New("UICorner", { CornerRadius = UDim.new(0, 12), Parent = Icon })
+	Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.Medium), Parent = Icon })
 
 	local IconDisplay = Library.New("ImageLabel", {
 		Name = "IconDisplay",
@@ -1010,12 +1010,34 @@ function Library.SetupAnimation(Animation, Window, Data)
 				for _, LightHouse in ipairs(LightHouseList) do
 					LightHouse:Destroy()
 				end
-			end
+			end,
 		}
 	end
 
 	return nil
 end
+
+Library.CornerPhases = {
+	High = 15,
+	Medium = 12,
+	Low = 8,
+}
+
+function Library:SetCornerSize(Phase, Size)
+	local PhaseSlot = Library.CornerPhases[Phase]
+	Signal:Assert(PhaseSlot, "Invalid phase name: " .. tostring(Phase), "Library:SetCornerPhase")
+
+	Library.CornerPhases[Phase] = Size
+
+	for _, Corner in pairs(Library.Instances) do
+		if Corner:IsA("UICorner") then
+			if Corner.CornerRadius.Offset == PhaseSlot then
+				Corner.CornerRadius = UDim.new(0, Size)
+			end
+		end
+	end
+end
+
 --// UI
 local OnDestroy = Signal.New()
 Global.OverlayDestroy = OnDestroy
@@ -1093,7 +1115,11 @@ AddToQueue:Connect(function(Notification)
 end)
 
 RemoveFromQueue:Connect(function(Notification)
-	Signal:Assert(Notification and Notification:FindFirstChildOfClass("TextButton"), "Argument is nil and/or no body was found", "RemoveFromQueue")
+	Signal:Assert(
+		Notification and Notification:FindFirstChildOfClass("TextButton"),
+		"Argument is nil and/or no body was found",
+		"RemoveFromQueue"
+	)
 
 	local Body = Notification:FindFirstChildOfClass("TextButton")
 	local StackSizeY = 0
@@ -1293,7 +1319,7 @@ function Library:Window(Data)
 	Library.SetGlobal("OverlayInjected", true)
 	Body = Window
 
-	Library.New("UICorner", { CornerRadius = UDim.new(0, 15), Parent = Window })
+	Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.High), Parent = Window })
 	Controller.WindowSize = Data and (Data.WindowSize or Data.Size) or UDim2.new(0, 700, 0, 500)
 	Controller.WindowTransparency = ThemeManager.CurrentTheme.BackgroundTransparency or Window.BackgroundTransparency
 
@@ -1321,7 +1347,7 @@ function Library:Window(Data)
 
 	Signal:Track(BackgroundImage)
 
-	Library.New("UICorner", { CornerRadius = UDim.new(0, 15), Parent = BackgroundImage })
+	Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.High), Parent = BackgroundImage })
 
 	if Data.ImageCorners then
 		if Data.ImageCorners.TopLeft then
@@ -1339,7 +1365,7 @@ function Library:Window(Data)
 				Ignore = true,
 			})
 
-			Library.New("UICorner", { CornerRadius = UDim.new(0, 15), Parent = TopLeft })
+			Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.High), Parent = TopLeft })
 		end
 
 		if Data.ImageCorners.TopRight then
@@ -1357,7 +1383,7 @@ function Library:Window(Data)
 				Ignore = true,
 			})
 
-			Library.New("UICorner", { CornerRadius = UDim.new(0, 15), Parent = TopRight })
+			Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.High), Parent = TopRight })
 		end
 
 		if Data.ImageCorners.DownLeft then
@@ -1375,7 +1401,7 @@ function Library:Window(Data)
 				Ignore = true,
 			})
 
-			Library.New("UICorner", { CornerRadius = UDim.new(0, 15), Parent = DownLeft })
+			Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.High), Parent = DownLeft })
 		end
 
 		if Data.ImageCorners.DownRight then
@@ -1393,7 +1419,7 @@ function Library:Window(Data)
 				Ignore = true,
 			})
 
-			Library.New("UICorner", { CornerRadius = UDim.new(0, 15), Parent = DownRight })
+			Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.High), Parent = DownRight })
 		end
 	end
 
@@ -1406,13 +1432,13 @@ function Library:Window(Data)
 		ZIndex = 5,
 	})
 
-	Library.New("UIListLayout", {
+	--[[Library.New("UIListLayout", {
 		FillDirection = Enum.FillDirection.Horizontal,
 		SortOrder = Enum.SortOrder.LayoutOrder,
 		HorizontalFlex = Enum.UIFlexAlignment.Fill,
 		Wraps = true,
 		Parent = MainOverlay,
-	})
+	})]]
 
 	local Sidebar = Library.New("Frame", {
 		Name = "Sidebar",
@@ -1900,7 +1926,7 @@ function Library:Window(Data)
 			Parent = Tab,
 		})
 
-		Library.New("UICorner", { CornerRadius = UDim.new(0, 12), Parent = Tab })
+		Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.Medium), Parent = Tab })
 		Library.New("UIPadding", {
 			PaddingTop = UDim.new(0, 8),
 			PaddingBottom = UDim.new(0, 8),
@@ -2240,8 +2266,7 @@ function Library:Window(Data)
 			}) :: TextBox
 
 			Library.NewSizeConstraint(NumberPlate, 50)
-
-			Library.New("UICorner", { CornerRadius = UDim.new(0, 8), Parent = NumberPlate })
+			Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.Low), Parent = NumberPlate })
 
 			Library.New("UIPadding", {
 				PaddingTop = UDim.new(0, 3),
@@ -2279,7 +2304,7 @@ function Library:Window(Data)
 				Parent = Interaction,
 			})
 
-			Library.New("UICorner", { CornerRadius = UDim.new(0, 8), Parent = Slider })
+			Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.Low), Parent = Slider })
 
 			local Percent = Library.New("Frame", {
 				Name = "Percent",
@@ -2289,7 +2314,7 @@ function Library:Window(Data)
 				Parent = Slider,
 			})
 
-			Library.New("UICorner", { CornerRadius = UDim.new(0, 8), Parent = Percent })
+			Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.Low), Parent = Percent })
 
 			--// Logic
 			local Max = Data and (Data.Max or Data.MaximumValue) or 100
@@ -2506,7 +2531,7 @@ function Library:Window(Data)
 
 				Library.New("UICorner", {
 					Name = "UICorner",
-					CornerRadius = UDim.new(0, 12),
+					CornerRadius = UDim.new(0, Library.CornerPhases.Medium),
 					Parent = ButtonHolder,
 				})
 
@@ -2608,7 +2633,7 @@ function Library:Window(Data)
 				Parent = Interaction,
 			}) :: Frame
 
-			Library.New("UICorner", { CornerRadius = UDim.new(0, 8), Parent = DropdownPlate })
+			Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.Low), Parent = DropdownPlate })
 			Library.NewSizeConstraint(DropdownPlate, 150)
 
 			Library.New("UIPadding", {
@@ -2829,7 +2854,7 @@ function Library:Window(Data)
 					end
 				end)
 
-				Library.New("UICorner", { CornerRadius = UDim.new(0, 15), Parent = ContextMenu })
+				Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.High), Parent = ContextMenu })
 
 				ActiveCloseThread = CloseThread:Connect(function()
 					for _, Button in ipairs(ContextMenu:GetChildren()) do
@@ -2903,7 +2928,7 @@ function Library:Window(Data)
 						Parent = ValueButton,
 					})
 
-					Library.New("UICorner", { CornerRadius = UDim.new(0, 12), Parent = ValueButton })
+					Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.Medium), Parent = ValueButton })
 
 					local Size = ValueButton.AbsoluteSize.Y
 					ValueButton.AutomaticSize = Enum.AutomaticSize.None
@@ -3047,7 +3072,7 @@ function Library:Window(Data)
 				Parent = Interaction,
 			}) :: Frame
 
-			Library.New("UICorner", { CornerRadius = UDim.new(0, 8), Parent = Input })
+			Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.Low), Parent = Input })
 			Library.New("UIPadding", {
 				PaddingTop = UDim.new(0, 3),
 				PaddingBottom = UDim.new(0, 3),
@@ -3585,7 +3610,7 @@ function Library:Window(Data)
 			Section.BackgroundTransparency = 1
 		end
 
-		Library.New("UICorner", { CornerRadius = UDim.new(0, 15), Parent = Section })
+		Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.High), Parent = Section })
 
 		local SectionToggle = Library.New("TextButton", {
 			Name = "SectionToggle",
@@ -3860,7 +3885,7 @@ function Library:Window(Data)
 			LayoutOrder = Data.Order,
 		})
 
-		Library.New("UICorner", { CornerRadius = UDim.new(0, 8), Parent = Button })
+		Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.Low), Parent = Button })
 
 		Library.New("ImageLabel", {
 			Position = UDim2.new(0.5, 0, 0.5, 0),
@@ -3922,7 +3947,7 @@ function Library:Window(Data)
 			Parent = Interaction,
 		})
 
-		Library.New("UICorner", { CornerRadius = UDim.new(0, 12), Parent = InteractionButton })
+		Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.Medium), Parent = InteractionButton })
 
 		Library.New("ImageLabel", {
 			Name = "Icon",
@@ -4070,7 +4095,7 @@ function Library:Window(Data)
 		})
 
 		Library.NewSizeConstraint(Profile, 200, 70)
-		Library.New("UICorner", { CornerRadius = UDim.new(0, 12), Parent = Profile })
+		Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.Medium), Parent = Profile })
 
 		Library.New("UIListLayout", {
 			HorizontalAlignment = Enum.HorizontalAlignment.Left,
@@ -4468,7 +4493,7 @@ function Library:Notify(Data)
 
 	Library.New("UICorner", {
 		Name = "UICorner",
-		CornerRadius = UDim.new(0, 15),
+		CornerRadius = UDim.new(0, Library.CornerPhases.High),
 		Parent = Body,
 	})
 
@@ -4493,7 +4518,7 @@ function Library:Notify(Data)
 
 		Library.New("UICorner", {
 			Name = "UICorner",
-			CornerRadius = UDim.new(0, 15),
+			CornerRadius = UDim.new(0, Library.CornerPhases.High),
 			Parent = BackgroundImage,
 		})
 	end
@@ -4554,7 +4579,7 @@ function Library:Notify(Data)
 
 			Library.New("UICorner", {
 				Name = "UICorner",
-				CornerRadius = UDim.new(0, 8),
+				CornerRadius = UDim.new(0, Library.CornerPhases.Low),
 				Parent = NotificationButton,
 			})
 
