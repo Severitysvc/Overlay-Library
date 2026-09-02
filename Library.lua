@@ -3813,7 +3813,7 @@ function Library:Window(Data)
 		end)
 
 		function TabController:Tab(Data)
-			local _, Body = Controller:Tab({
+			local Elements, Body = Controller:Tab({
 				Title = Data and (Data.Title or Data.Name) or "Tab",
 				Description = Data and (Data.Description or Data.Desc) or "Description",
 				Icon = Data and (Data.Icon or Data.Image) or "",
@@ -3835,6 +3835,8 @@ function Library:Window(Data)
 					end)
 				end
 			end
+
+			return Elements
 		end
 
 		if Opened then
