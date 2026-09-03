@@ -3642,6 +3642,7 @@ function Library:Window(Data)
 					StrokeEnabled = Args and (Args.StrokeEnabled or Args.Stroke) or false,
 					Icon = Args and (Args.Icon or Args.Image) or "",
 					Transparency = Args and (Args.Transparency or Args.TransparencyPhase) or "Min",
+					Value = Args and (Args.Value or Args.Default) or false
 					Callback = Args.Callback,
 				})
 
