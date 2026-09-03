@@ -3695,6 +3695,7 @@ function Library:Window(Data)
 					StrokeEnabled = Args and (Args.StrokeEnabled or Args.Stroke) or false,
 					Transparency = Args and (Args.Transparency or Args.TransparencyPhase) or "Min",
 					KeyPressCallback = Args and Args.OnKeyPressCallback or function() end,
+					Callback = Args and Args.Callback or function() end,
 				})
 
 				_Body.ElementBody.Parent = Body.ElementBody
