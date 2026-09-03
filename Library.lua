@@ -407,7 +407,7 @@ function Library.DestroyAll()
 	Library.Instances = {}
 end
 
-function Library.SetupCommonElementBody(Data)
+function Library.SetupBody(Data)
 	local Body = {}
 
 	local HoverStart = Signal.New()
@@ -577,6 +577,10 @@ function Library.SetupCommonElementBody(Data)
 	Body.Interaction = Interaction
 	Body.Header = Header
 	Body.ElementBody = ElementBody
+
+	Body.Icon = Icon
+	Body.Title = Title
+	Body.Description = Description
 
 	local OldTransparency = ElementBody.BackgroundTransparency
 
@@ -2103,7 +2107,7 @@ function Library:Window(Data)
 		--// Elements
 		function Elements:Toggle(Data)
 			local Methods = {}
-			local Body = Library.SetupCommonElementBody({
+			local Body = Library.SetupBody({
 				Title = Data and (Data.Title or Data.Name) or "Toggle",
 				Description = Data and (Data.Desc or Data.Description) or "Description",
 				Icon = Data and (Data.Icon or Data.Image) or "",
@@ -2239,7 +2243,7 @@ function Library:Window(Data)
 
 		function Elements:Slider(Data)
 			local Methods = {}
-			local Body = Library.SetupCommonElementBody({
+			local Body = Library.SetupBody({
 				Title = Data and (Data.Title or Data.Name) or "Toggle",
 				Description = Data and (Data.Desc or Data.Description) or "Description",
 				Icon = Data and (Data.Icon or Data.Image) or "",
@@ -2490,7 +2494,7 @@ function Library:Window(Data)
 
 		function Elements:Button(Data)
 			local Methods = {}
-			local Body = Library.SetupCommonElementBody({
+			local Body = Library.SetupBody({
 				Title = Data and (Data.Title or Data.Name) or "Toggle",
 				Description = Data and (Data.Desc or Data.Description) or "Description",
 				Icon = Data and (Data.Icon or Data.Image) or "",
@@ -2607,7 +2611,7 @@ function Library:Window(Data)
 
 		function Elements:Dropdown(Data)
 			local Methods = {}
-			local Body = Library.SetupCommonElementBody({
+			local Body = Library.SetupBody({
 				Title = Data and (Data.Title or Data.Name) or "Toggle",
 				Description = Data and (Data.Desc or Data.Description) or "Description",
 				Icon = Data and (Data.Icon or Data.Image) or "",
@@ -2928,7 +2932,10 @@ function Library:Window(Data)
 						Parent = ValueButton,
 					})
 
-					Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.Medium), Parent = ValueButton })
+					Library.New(
+						"UICorner",
+						{ CornerRadius = UDim.new(0, Library.CornerPhases.Medium), Parent = ValueButton }
+					)
 
 					local Size = ValueButton.AbsoluteSize.Y
 					ValueButton.AutomaticSize = Enum.AutomaticSize.None
@@ -3046,7 +3053,7 @@ function Library:Window(Data)
 
 		function Elements:Keybind(Data)
 			local Methods = {}
-			local Body = Library.SetupCommonElementBody({
+			local Body = Library.SetupBody({
 				Title = Data and (Data.Title or Data.Name) or "Toggle",
 				Description = Data and (Data.Desc or Data.Description) or "Description",
 				Icon = Data and (Data.Icon or Data.Image) or "",
@@ -3204,9 +3211,124 @@ function Library:Window(Data)
 			return Methods, Body
 		end
 
+		function Elements:Label(Data)
+			local Methods = {}
+			local Section = Library.New("TextButton", {
+				Name = "Section",
+				Size = UDim2.new(1, 0, 0, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundTransparency = 1,
+				Parent = Container,
+			})
+
+			local SectionTitle = Library.New("TextLabel", {
+				Name = "SectionTitle",
+				AutomaticSize = Enum.AutomaticSize.XY,
+				BackgroundTransparency = 1,
+				Text = Data and (Data.Title or Data.Text or Data.Name) or "Label",
+				TextSize = Data and Data.TextSize or 20,
+				TextTransparency = 0.2,
+				FontFace = Font.new("rbxassetid://16658221428", Enum.FontWeight.Medium),
+				Parent = Section,
+			})
+
+			Library.New("UIListLayout", {
+				FillDirection = Enum.FillDirection.Horizontal,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 6),
+				Parent = Section,
+			})
+
+			local Icon = Library.New("ImageLabel", {
+				Name = "Icon",
+				Position = UDim2.new(-0.005, 0, 0, 0),
+				Size = UDim2.fromOffset(24, 24),
+				BackgroundTransparency = 1,
+				Image = Data and (Data.Icon or Data.Image) or "",
+				ImageTransparency = 0.2,
+				Parent = Section,
+			})
+
+			Signal:Track(Icon)
+
+			function Methods:Set(Text)
+				Signal:Assert(Text and type(Text) == "string", "Argument is nil and/or is not a string", "Label:Set")
+
+				SectionTitle.Text = Text
+			end
+
+			function Methods:SetIcon(Image)
+				Signal:Assert(
+					Image and type(Image) == "string",
+					"Argument is nil and/or is not a string",
+					"Label:SetIcon"
+				)
+
+				Icon.Image = Image
+			end
+
+			return Methods, Section
+		end
+
+		function Elements:Paragraph(Data)
+			local Methods = {}
+			local Body = Library.SetupBody({
+				Title = Data and (Data.Title or Data.Name) or "Toggle",
+				Description = Data and (Data.Desc or Data.Description) or "Description",
+				Icon = Data and (Data.Icon or Data.Image) or "",
+				StrokeEnabled = Data and (Data.StrokeEnabled or Data.Stroke) or false,
+				Transparency = Data and (Data.Transparency or Data.TransparencyPhase) or "Min",
+				Parent = Container,
+			})
+
+			local Interaction = Body.Interaction
+			local ElementBody = Body.ElementBody
+			local Header = Body.Header
+
+			Interaction.Visible = false
+			Header.Size = UDim2.fromScale(1, 0)
+
+			Body.Title.Size = UDim2.fromScale(0.95, 0)
+			Body.Description.Size = UDim2.fromScale(0.95, 0)
+
+			function Methods:SetBackgroundTransparency(Transparency)
+				Signal:Assert(
+					Transparency and type(Transparency) == "number",
+					"Argument is nil and/or is not a number",
+					"Paragraph:SetBackgroundTransparency"
+				)
+
+				ElementBody.BackgroundTransparency = Transparency
+			end
+
+			function Methods:SetBackgroundColor(Color)
+				Signal:Assert(
+					Color and typeof(Color) == "Color3",
+					"Argument is nil and/or is not a Color3",
+					"Paragraph:SetBackgroundColor"
+				)
+
+				ElementBody.BackgroundColor3 = Color
+			end
+
+			function Methods:FillIcon()
+				local Icon = Body.Icon:FindFirstChildOfClass("ImageLabel")
+				local Corner = Body.Icon:FindFirstChildOfClass("UICorner")
+
+				Icon.Size = UDim2.fromScale(1, 1)
+				Icon.ImageTransparency = 0
+
+				Body.Icon.BackgroundTransparency = 1
+				Corner:Clone().Parent = Icon
+			end
+
+			return Methods, Body
+		end
+
 		function Elements:Section(Data)
 			local Methods = {}
-			local Body = Library.SetupCommonElementBody({
+			local Body = Library.SetupBody({
 				Title = Data and (Data.Title or Data.Name) or "Toggle",
 				Description = Data and (Data.Desc or Data.Description) or "Description",
 				Icon = Data and (Data.Icon or Data.Image) or "",
@@ -3514,7 +3636,7 @@ function Library:Window(Data)
 			end
 
 			function Methods:Toggle(Args)
-				local Element, MethodBody = Elements:Toggle({
+				local Element, _Body = Elements:Toggle({
 					Title = Args and (Args.Title or Args.Name) or "Toggle",
 					Description = Args and (Args.Desc or Args.Description) or "Description",
 					StrokeEnabled = Args and (Args.StrokeEnabled or Args.Stroke) or false,
@@ -3523,12 +3645,12 @@ function Library:Window(Data)
 					Callback = Args.Callback,
 				})
 
-				MethodBody.ElementBody.Parent = Body.ElementBody
+				_Body.ElementBody.Parent = Body.ElementBody
 				return Element
 			end
 
 			function Methods:Slider(Args)
-				local Element, MethodBody = Elements:Slider({
+				local Element, _Body = Elements:Slider({
 					Title = Args and (Args.Title or Args.Name) or "Toggle",
 					Description = Args and (Args.Desc or Args.Description) or "Description",
 					Icon = Args and (Args.Icon or Args.Image) or "",
@@ -3542,12 +3664,12 @@ function Library:Window(Data)
 					Callback = Args.Callback,
 				})
 
-				MethodBody.ElementBody.Parent = Body.ElementBody
+				_Body.ElementBody.Parent = Body.ElementBody
 				return Element
 			end
 
 			function Methods:Dropdown(Args)
-				local Element, MethodBody = Elements:Dropdown({
+				local Element, _Body = Elements:Dropdown({
 					Title = Args and (Args.Title or Args.Name) or "Toggle",
 					Description = Args and (Args.Desc or Args.Description) or "Description",
 					Icon = Args and (Args.Icon or Args.Image) or "",
@@ -3560,7 +3682,46 @@ function Library:Window(Data)
 					Callback = Args.Callback,
 				})
 
-				MethodBody.ElementBody.Parent = Body.ElementBody
+				_Body.ElementBody.Parent = Body.ElementBody
+				return Element
+			end
+
+			function Methods:Keybind(Args)
+				local Element, _Body = Elements:Keybind({
+					Title = Args and (Args.Title or Args.Name) or "Toggle",
+					Description = Args and (Args.Desc or Args.Description) or "Description",
+					Icon = Args and (Args.Icon or Args.Image) or "",
+					Value = Args and (Args.Value or Args.Default) or Enum.KeyCode.Asterisk,
+					StrokeEnabled = Args and (Args.StrokeEnabled or Args.Stroke) or false,
+					Transparency = Args and (Args.Transparency or Args.TransparencyPhase) or "Min",
+					KeyPressCallback = Args and Args.OnKeyPressCallback or function() end,
+				})
+
+				_Body.ElementBody.Parent = Body.ElementBody
+				return Element
+			end
+
+			function Methods:Label(Args)
+				local Element, _Body = Elements:Label({
+					Title = Args and (Args.Title or Args.Name) or "Label",
+					TextSize = Args and Args.TextSize or 20,
+					Icon = Args and (Args.Icon or Args.Image) or "",
+				})
+
+				_Body.Parent = Body.ElementBody
+				return Element
+			end
+
+			function Methods:Paragraph(Args)
+				local Element, _Body = Elements:Paragraph({
+					Title = Args and (Args.Title or Args.Name) or "Toggle",
+					Description = Args and (Args.Desc or Args.Description) or "Description",
+					Icon = Args and (Args.Icon or Args.Image) or "",
+					StrokeEnabled = Args and (Args.StrokeEnabled or Args.Stroke) or false,
+					Transparency = Args and (Args.Transparency or Args.TransparencyPhase) or "Min",
+				})
+
+				_Body.ElementBody.Parent = Body.ElementBody
 				return Element
 			end
 
@@ -3836,7 +3997,7 @@ function Library:Window(Data)
 				end
 			end
 
-			return Elements
+			return Elements, Body
 		end
 
 		if Opened then
@@ -4059,8 +4220,13 @@ function Library:Window(Data)
 
 	function Controller:UnloadAnimation()
 		Signal:Assert(Controller.LoadedAnimation, "No loaded animation", ":UnloadAnimation")
-		Controller.LoadedAnimation:Unload()
-		BackgroundImage.Visible = true
+
+		if Controller.LoadedAnimation then
+			Controller.LoadedAnimation:Unload()
+			Controller.LoadedAnimation = nil
+
+			BackgroundImage.Visible = true
+		end
 	end
 
 	do --// Topbar Buttons
