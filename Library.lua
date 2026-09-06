@@ -1,4 +1,4 @@
---[[
+:--[[
 	// Overlay Library 
 	// Made By: Severitysvc
 ]]
@@ -2676,7 +2676,7 @@ function Library:Window(Data)
 			})
 
 			if Data.DropdownIcon then
-				Library.New("ImageLabel", {
+				local Icon = Library.New("ImageLabel", {
 					Name = "Icon",
 					Size = UDim2.new(0, 20, 0, 20),
 					LayoutOrder = 1,
@@ -2686,6 +2686,8 @@ function Library:Window(Data)
 					ImageTransparency = 0.2,
 					Parent = DropdownPlate,
 				})
+
+				Signal:Track(Icon)
 			end
 
 			--// Logic
