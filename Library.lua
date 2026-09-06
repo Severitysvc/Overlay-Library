@@ -2686,8 +2686,6 @@ function Library:Window(Data)
 					ImageTransparency = 0.2,
 					Parent = DropdownPlate,
 				})
-
-				Signal:Track(Icon)
 			end
 
 			--// Logic
