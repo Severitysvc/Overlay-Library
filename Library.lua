@@ -2963,7 +2963,7 @@ function Library:Window(Data)
 					end
 
 					for _, Button in ipairs(ContextMenu:GetChildren()) do
-						if Button:IsA("TextButton") then
+						if Button:IsA("TextButton") and Button:FindFirstChildOfClass("TextLabel") then
 							Signal:Animate(
 								Button,
 								{ Time = 0.15, Style = Enum.EasingStyle.Sine, Direction = Enum.EasingDirection.Out },
