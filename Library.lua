@@ -1303,6 +1303,7 @@ function Library:Window(Data)
 
 	Controller.SelectedTab = nil
 	Controller.SelectedContainer = nil
+	Controller.Corners = {}
 
 	Controller.OnDestroy = OnDestroy
 	Controller.OnMinimize = Minimize
@@ -1334,12 +1335,13 @@ function Library:Window(Data)
 		Position = UDim2.new(0.500, 0, -0.025, 0),
 		Size = UDim2.new(0.300, 0, 0, 6),
 		AnchorPoint = Vector2.new(0.500, 0),
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		AutomaticSize = Enum.AutomaticSize.None,
 		SizeConstraint = Enum.SizeConstraint.RelativeXY,
 		Rotation = 0,
 		Active = false,
 		Selectable = false,
-		BackgroundTransparency = 0.9,
+		BackgroundTransparency = 0.6,
 		BorderColor3 = Color3.fromRGB(0, 0, 0),
 		BorderSizePixel = 0,
 		BorderMode = Enum.BorderMode.Outline,
@@ -1358,7 +1360,7 @@ function Library:Window(Data)
 		Signal:Animate(
 			DragBar,
 			{ Time = 0.25, Style = Enum.EasingStyle.Sine, Direction = Enum.EasingDirection.Out },
-			{ BackgroundTransparency = 0.6 }
+			{ BackgroundTransparency = 0.2 }
 		)
 	end)
 
@@ -1372,7 +1374,7 @@ function Library:Window(Data)
 		Signal:Animate(
 			DragBar,
 			{ Time = 0.25, Style = Enum.EasingStyle.Sine, Direction = Enum.EasingDirection.Out },
-			{ BackgroundTransparency = 0.9 }
+			{ BackgroundTransparency = 0.6 }
 		)
 	end)
 
@@ -1401,7 +1403,7 @@ function Library:Window(Data)
 	})
 
 	Library.SetGlobal("OverlayInjected", true)
-	Body = Window
+	Body.Window = Window
 
 	Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.High), Parent = Window })
 	Controller.WindowSize = Data and (Data.WindowSize or Data.Size) or UDim2.new(0, 700, 0, 500)
@@ -1430,83 +1432,81 @@ function Library:Window(Data)
 		Parent = IgnoreLayout,
 	}) :: ImageLabel
 
-	Signal:Track(BackgroundImage)
+	Body.BackgroundImage = BackgroundImage
 
+	Signal:Track(BackgroundImage)
 	Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.High), Parent = BackgroundImage })
 
-	if Data.ImageCorners then
-		if Data.ImageCorners.TopLeft then
-			local TopLeft = Library.New("ImageLabel", {
-				Name = "TopLeft",
-				ZIndex = 1,
-				Position = UDim2.new(0, -1, 0, -1),
-				Size = UDim2.new(1, 0, 1, 0),
-				BackgroundTransparency = 1,
-				BorderSizePixel = 0,
-				Image = "rbxassetid://90085857557952",
-				ImageColor3 = Data.ImageCorners.TopLeft.Color or Color3.fromRGB(255, 255, 255),
-				ImageTransparency = Data.ImageCorners.TopLeft.Transparency or 0.9,
-				Parent = IgnoreLayout,
-				Ignore = true,
-			})
+	local CornerData = Data.ImageCorners or {}
+	local Corners = Controller.Corners
 
-			Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.High), Parent = TopLeft })
-		end
+	Corners.TopLeft = Library.New("ImageLabel", {
+		Name = "TopLeft",
+		ZIndex = 1,
+		Position = UDim2.new(0, -1, 0, -1),
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Image = "rbxassetid://90085857557952",
+		ImageColor3 = Color3.fromRGB(255, 255, 255),
+		ImageTransparency = 1,
+		Parent = IgnoreLayout,
+		Ignore = true,
+		Visible = CornerData.TopLeft and CornerData.TopLeft.Enabled or false,
+	})
 
-		if Data.ImageCorners.TopRight then
-			local TopRight = Library.New("ImageLabel", {
-				Name = "TopRight",
-				ZIndex = 1,
-				Position = UDim2.new(0, 1, 0, -1),
-				Size = UDim2.new(1, 0, 1, 0),
-				BackgroundTransparency = 1,
-				BorderSizePixel = 0,
-				Image = "rbxassetid://136612025197923",
-				ImageColor3 = Data.ImageCorners.TopRight.Color or Color3.fromRGB(255, 255, 255),
-				ImageTransparency = Data.ImageCorners.TopRight.Transparency or 0.9,
-				Parent = IgnoreLayout,
-				Ignore = true,
-			})
+	Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.High), Parent = Corners.TopLeft })
 
-			Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.High), Parent = TopRight })
-		end
+	Corners.TopRight = Library.New("ImageLabel", {
+		Name = "TopRight",
+		ZIndex = 1,
+		Position = UDim2.new(0, 1, 0, -1),
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Image = "rbxassetid://136612025197923",
+		ImageColor3 = Color3.fromRGB(255, 255, 255),
+		ImageTransparency = 1,
+		Parent = IgnoreLayout,
+		Ignore = true,
+		Visible = CornerData.TopRight and CornerData.TopRight.Enabled or false,
+	})
 
-		if Data.ImageCorners.DownLeft then
-			local DownLeft = Library.New("ImageLabel", {
-				Name = "DownLeft",
-				ZIndex = 1,
-				Position = UDim2.new(0, 1, 0, 1),
-				Size = UDim2.new(1, 0, 1, 0),
-				BackgroundTransparency = 1,
-				BorderSizePixel = 0,
-				Image = "rbxassetid://80706260659632",
-				ImageColor3 = Data.ImageCorners.DownLeft.Color or Color3.fromRGB(255, 255, 255),
-				ImageTransparency = Data.ImageCorners.DownLeft.Transparency or 0.9,
-				Parent = IgnoreLayout,
-				Ignore = true,
-			})
+	Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.High), Parent = Corners.TopRight })
 
-			Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.High), Parent = DownLeft })
-		end
+	Corners.DownLeft = Library.New("ImageLabel", {
+		Name = "DownLeft",
+		ZIndex = 1,
+		Position = UDim2.new(0, -1, 0, 1),
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Image = "rbxassetid://80706260659632",
+		ImageColor3 = Color3.fromRGB(255, 255, 255),
+		ImageTransparency = 1,
+		Parent = IgnoreLayout,
+		Ignore = true,
+		Visible = CornerData.DownLeft and CornerData.DownLeft.Enabled or false,
+	})
 
-		if Data.ImageCorners.DownRight then
-			local DownRight = Library.New("ImageLabel", {
-				Name = "DownRight",
-				ZIndex = 1,
-				Position = UDim2.new(0, 1, 0, 1),
-				Size = UDim2.new(1, 0, 1, 0),
-				BackgroundTransparency = 1,
-				BorderSizePixel = 0,
-				Image = "rbxassetid://117215442732435",
-				ImageColor3 = Data.ImageCorners.DownRight.Color or Color3.fromRGB(255, 255, 255),
-				ImageTransparency = Data.ImageCorners.DownRight.Transparency or 0.9,
-				Parent = IgnoreLayout,
-				Ignore = true,
-			})
+	Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.High), Parent = Corners.DownLeft })
 
-			Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.High), Parent = DownRight })
-		end
-	end
+	Corners.DownRight = Library.New("ImageLabel", {
+		Name = "DownRight",
+		ZIndex = 1,
+		Position = UDim2.new(0, 1, 0, 1),
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Image = "rbxassetid://117215442732435",
+		ImageColor3 = Color3.fromRGB(255, 255, 255),
+		ImageTransparency = 1,
+		Parent = IgnoreLayout,
+		Ignore = true,
+		Visible = CornerData.DownRight and CornerData.DownRight.Enabled or false,
+	})
+
+	Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.High), Parent = Corners.DownRight })
 
 	local MainOverlay = Library.New("Frame", {
 		Name = "MainOverlay",
@@ -2173,6 +2173,12 @@ function Library:Window(Data)
 
 		--// Logic
 		Deselect:Fire(Tab, Container)
+
+		local CallbackOnSelect = Signal.New()
+		local CallbackOnDeselect = Signal.New()
+
+		Elements.OnSelect = CallbackOnSelect
+		Elements.OnDeselect = CallbackOnDeselect
 
 		Tab.MouseButton1Click:Connect(function()
 			Select:Fire(Tab, Container)
@@ -3469,6 +3475,236 @@ function Library:Window(Data)
 			return Methods, Divider
 		end
 
+		function Elements:ProfileBanner(Data)
+			local Methods = {}
+			local Profile = Library.New("Frame", {
+				Name = "Profile",
+				Position = UDim2.fromScale(0.012, 0.082),
+				Size = UDim2.fromScale(1, 0.15),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				Parent = Container,
+			})
+
+			Library.New("UIListLayout", {
+				FillDirection = Enum.FillDirection.Horizontal,
+				HorizontalAlignment = Enum.HorizontalAlignment.Left,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 8),
+				Parent = Profile,
+			})
+
+			Library.New("UIPadding", {
+				PaddingTop = UDim.new(0, 8),
+				PaddingBottom = UDim.new(0, 8),
+				PaddingLeft = UDim.new(0, 8),
+				PaddingRight = UDim.new(0, 8),
+				Parent = Profile,
+			})
+
+			local Icon = Library.New("ImageLabel", {
+				Name = "Icon",
+				Visible = true,
+				ZIndex = 1,
+				LayoutOrder = 1,
+				Position = UDim2.new(0.195, 0, 0.500, 0),
+				Size = UDim2.new(0.000, 65, 0.000, 65),
+				AnchorPoint = Vector2.new(0.500, 0.500),
+				BackgroundColor3 = Color3.fromRGB(163, 162, 165),
+				BackgroundTransparency = 0.95,
+				Transparency = 0.95,
+				Image = "rbxthumb://type=AvatarHeadShot&id=2343555344&w=420&h=420",
+				ImageColor3 = Color3.fromRGB(255, 255, 255),
+				ImageTransparency = 0,
+				Rotation = 0,
+				Parent = Profile,
+			})
+
+			Library.New("UIStroke", {
+				Name = "UIStroke",
+				ZIndex = 1,
+				Transparency = 0.9,
+				Color = Color3.fromRGB(255, 255, 255),
+				Thickness = 1,
+				Enabled = true,
+				Parent = Icon,
+			})
+
+			Library.New("UICorner", {
+				Name = "UICorner",
+				CornerRadius = UDim.new(1.000, 0),
+				Parent = Icon,
+			})
+
+			local Displays = Library.New("Frame", {
+				Name = "Display",
+				Visible = true,
+				LayoutOrder = 1,
+				Position = UDim2.new(0.156, 0, 0.115, 0),
+				Size = UDim2.new(0.500, 0, 0.769, 0),
+				AnchorPoint = Vector2.new(0.000, 0.000),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundColor3 = Color3.fromRGB(163, 162, 165),
+				BackgroundTransparency = 1,
+				ClipsDescendants = false,
+				Transparency = 1,
+				Parent = Profile,
+			})
+
+			Library.New("UIListLayout", {
+				Name = "UIListLayout",
+				FillDirection = Enum.FillDirection.Vertical,
+				HorizontalAlignment = Enum.HorizontalAlignment.Left,
+				VerticalAlignment = Enum.VerticalAlignment.Top,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0.000, 0),
+				ItemLineAlignment = Enum.ItemLineAlignment.Automatic,
+				Parent = Displays,
+			})
+
+			local Display = Library.New("TextLabel", {
+				Name = "Display",
+				Visible = true,
+				AutomaticSize = Enum.AutomaticSize.XY,
+				BackgroundColor3 = Color3.fromRGB(163, 162, 165),
+				BackgroundTransparency = 1,
+				LayoutOrder = 1,
+				Text = LocalPlayer.DisplayName or "Display",
+				TextColor3 = Color3.fromRGB(255, 255, 255),
+				TextSize = 22,
+				TextTransparency = 0.20000000298023224,
+				TextWrapped = true,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextYAlignment = Enum.TextYAlignment.Center,
+				TextTruncate = Enum.TextTruncate.AtEnd,
+				FontFace = Font.new("rbxassetid://16658221428", Enum.FontWeight.Medium, Enum.FontStyle.Normal),
+				RichText = true,
+				Parent = Displays,
+			})
+
+			local User = Library.New("TextLabel", {
+				Name = "User",
+				Visible = true,
+				ZIndex = 1,
+				LayoutOrder = 2,
+				Position = UDim2.new(0.000, 0, 0.000, 0),
+				Size = UDim2.new(0.000, 0, 0.000, 0),
+				AnchorPoint = Vector2.new(0.000, 0.000),
+				AutomaticSize = Enum.AutomaticSize.XY,
+				BackgroundColor3 = Color3.fromRGB(163, 162, 165),
+				BackgroundTransparency = 1,
+				Text = LocalPlayer.Name or "username",
+				TextColor3 = Color3.fromRGB(255, 255, 255),
+				TextSize = 14,
+				TextTransparency = 0.5,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextYAlignment = Enum.TextYAlignment.Center,
+				TextTruncate = Enum.TextTruncate.AtEnd,
+				FontFace = Font.new("rbxassetid://16658221428", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
+				Parent = Displays,
+			})
+
+			local ID = Library.New("TextLabel", {
+				Name = "ID",
+				Visible = true,
+				AutomaticSize = Enum.AutomaticSize.XY,
+				SizeConstraint = Enum.SizeConstraint.RelativeXY,
+				BackgroundColor3 = Color3.fromRGB(163, 162, 165),
+				LayoutOrder = 3,
+				BackgroundTransparency = 1,
+				Text = tostring(LocalPlayer.UserId),
+				TextColor3 = Color3.fromRGB(255, 255, 255),
+				TextSize = 14,
+				TextTransparency = 0.5,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextYAlignment = Enum.TextYAlignment.Center,
+				TextTruncate = Enum.TextTruncate.AtEnd,
+				FontFace = Font.new("rbxassetid://16658221428", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
+				Parent = Displays,
+			})
+
+			local IgnoreLayout = Library.New("Folder", {
+				Name = "IgnoreLayout",
+				Parent = Profile,
+			})
+
+			Library.New("UIListLayout", {
+				Name = "UIListLayout",
+				FillDirection = Enum.FillDirection.Horizontal,
+				HorizontalAlignment = Enum.HorizontalAlignment.Right,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 6),
+				Parent = IgnoreLayout,
+			})
+
+			function Methods:Button(Data)
+				local Button = Library.New("TextButton", {
+					Name = "Button",
+					LayoutOrder = Data.Order or 1,
+					Size = UDim2.new(0, 30, 0, 30),
+					BackgroundTransparency = 0.95,
+					Parent = IgnoreLayout,
+				})
+
+				Library.New("UICorner", {
+					Name = "UICorner",
+					CornerRadius = UDim.new(0, 8),
+					Parent = Button,
+				})
+
+				local Icon = Library.New("ImageLabel", {
+					Name = "Icon",
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.new(0.5, 0, 0.5, 0),
+					Size = UDim2.new(0, 16, 0, 16),
+					BackgroundTransparency = 1,
+					Image = Data and Data.Icon or "",
+					ImageTransparency = 0.4,
+					Parent = Button,
+				})
+
+				--// Logic
+				local Callback = Signal:Callback(Data and Data.Callback or function() end)
+				local HoverStart = Signal.New()
+				local HoverEnd = Signal.New()
+
+				HoverStart:Connect(function()
+					Signal:Animate(
+						Button,
+						{ Time = 0.25, Style = Enum.EasingStyle.Quad, Direction = Enum.EasingDirection.Out },
+						{ BackgroundTransparency = 0.9 }
+					)
+				end)
+
+				HoverEnd:Connect(function()
+					Signal:Animate(
+						Button,
+						{ Time = 0.25, Style = Enum.EasingStyle.Quad, Direction = Enum.EasingDirection.Out },
+						{ BackgroundTransparency = 0.95 }
+					)
+				end)
+
+				Button.MouseEnter:Connect(function()
+					HoverStart:Fire()
+				end)
+
+				Button.MouseLeave:Connect(function()
+					HoverEnd:Fire()
+				end)
+
+				Button.MouseButton1Click:Connect(function()
+					Callback:Fire()
+				end)
+
+				return Button
+			end
+
+			return Methods
+		end
+
 		function Elements:Paragraph(Data)
 			local Methods = {}
 			local Body = Library.SetupBody({
@@ -4117,6 +4353,18 @@ function Library:Window(Data)
 			Deselect:Fire(Tab, Container)
 		end
 
+		Select:Connect(function(_Tab, C)
+			if _Tab == Tab then
+				CallbackOnSelect:Fire()
+			end
+		end)
+
+		Deselect:Connect(function(_Tab, C)
+			if _Tab == Tab then
+				CallbackOnDeselect:Fire()
+			end
+		end)
+
 		return Elements, Tab, Container
 	end
 
@@ -4420,7 +4668,19 @@ function Library:Window(Data)
 
 	function Controller:SetBackgroundImage(Image)
 		Signal:Assert(Image and type(Image) == "string", "Argument is nil and/or is not a string", "SetBackgroundImage")
+		local Clone = BackgroundImage:Clone()
+		Clone.ImageTransparency = 0
 		BackgroundImage.Image = Image
+
+		Signal:Animate(
+			Clone,
+			{ Time = 0.35, Style = Enum.EasingStyle.Cubic, Direction = Enum.EasingDirection.InOut },
+			{ ImageTransparency = 1 }
+		)
+
+		task.delay(0.35, function()
+			Clone:Destroy()
+		end)
 	end
 
 	function Controller:SetBackgroundImageTransparency(Transparency)
@@ -4430,7 +4690,11 @@ function Library:Window(Data)
 			"SetBackgroundImageTransparency"
 		)
 
-		BackgroundImage.ImageTransparency = Transparency
+		Signal:Animate(
+			BackgroundImage,
+			{ Time = 0.25, Style = Enum.EasingStyle.Cubic, Direction = Enum.EasingDirection.InOut },
+			{ ImageTransparency = Transparency }
+		)
 	end
 
 	function Controller:NewTopbarButton(Data)
@@ -4616,6 +4880,21 @@ function Library:Window(Data)
 		OnDestroy:Fire()
 	end
 
+	function Controller:SetCornerProperty(Name, Property, Value)
+		local Corner = Controller.Corners[Name]
+		if Corner then
+			if string.find(Property, "Color") or string.find(Property, "Transparency") then
+				Signal:Animate(
+					Corner,
+					{ Time = 0.6, Style = Enum.EasingStyle.Quad, Direction = Enum.EasingDirection.Out },
+					{ [Property] = Value }
+				)
+			else
+				Corner[Property] = Value
+			end
+		end
+	end
+
 	--// Animations
 	function Controller:LoadAnimation(Animation, Data)
 		Controller.LoadedAnimation = Library.SetupAnimation(Animation, IgnoreLayout, Data)
@@ -4658,7 +4937,7 @@ function Library:Window(Data)
 	if Data.Profile then
 		local Profile = Library.New("Frame", {
 			Name = "Profile",
-			LayoutOrder = 1,
+			LayoutOrder = Data.Profile.Order or 1,
 			Size = UDim2.new(1, 0, 0.15, 0),
 			BackgroundTransparency = Data.Profile.Transparent and 1 or 0.95,
 			Role = "Accent",
