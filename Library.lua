@@ -6,6 +6,8 @@
 --// Library
 local Library = {}
 Library.Instances = {}
+Library.Connections = {}
+Library.Signals = {}
 Library.LibraryDebugs = true
 Library.Hidden = false
 
@@ -16,6 +18,16 @@ Signal.__index = Signal
 --// ThemeManager
 local ThemeManager = {}
 ThemeManager.__index = ThemeManager
+
+function Library.Get(Data, Keys, Default)
+	for _, Key in ipairs(Keys) do
+		if Data[Key] ~= nil then
+			return Data[Key]
+		end
+	end
+
+	return Default
+end
 
 --// Services
 local CloneReference = cloneref or clonereference or function(Object)
@@ -53,6 +65,7 @@ end
 function Signal.New()
 	local self = setmetatable({}, Signal)
 	self.Connections = {}
+	table.insert(Library.Signals, self)
 
 	return self
 end
@@ -77,24 +90,31 @@ function Signal:Connect(Func)
 end
 
 function Signal:Once(Func)
-	local Connection
-	Connection = self:Connect(function(...)
-		Connection:Disconnect()
-		Func(...)
-	end)
+	local Connection = self:Connect(Func)
+	Connection.Once = true
 
 	return Connection
 end
 
 function Signal:Fire(...)
-	for _, Connection in ipairs(self.Connections) do
+	local Connections = table.clone(self.Connections)
+
+	for _, Connection in ipairs(Connections) do
 		if Connection.Connected then
+			if Connection.Once then
+				Connection:Disconnect()
+			end
+
 			task.spawn(Connection.Func, ...)
 		end
 	end
 end
 
 function Signal:DisconnectAll()
+	for _, Connection in ipairs(self.Connections) do
+		Connection.Connected = false
+	end
+
 	self.Connections = {}
 end
 
@@ -105,12 +125,34 @@ function Signal:Debug(Input, Thread)
 end
 
 function Signal:Assert(Condition, Text, Thread)
-	Thread = Thread or ""
-
-	if not Condition then
-		Signal:Debug(Text, Thread)
-		return
+	if Condition then
+		return true
 	end
+
+	local Source = "unknown source"
+	local Line = "?"
+	local FunctionName = "anonymous"
+
+	if debug and type(debug.info) == "function" then
+		local Success, CallerSource, CallerLine, CallerName = pcall(debug.info, 2, "sln")
+
+		if Success then
+			Source = CallerSource or Source
+			Line = CallerLine or Line
+			FunctionName = CallerName or FunctionName
+		end
+	end
+
+	error(
+		("[Overlay Error] %s\n  Context: %s\n  Function: %s\n  Location: %s:%s"):format(
+			tostring(Text or "No error set."),
+			tostring(Thread or "Thread"),
+			FunctionName,
+			Source,
+			Line
+		),
+		2
+	)
 end
 
 function Signal:MatchInput(Input, ...)
@@ -182,6 +224,10 @@ function Signal:Track(Object, OptionalTarget)
 end
 
 function Signal:Callback(Func)
+	if Func == nil then
+		Func = function() end
+	end
+
 	Signal:Assert(Func and type(Func) == "function", "Argument is nil and/or is not a function", "Callback")
 	local Callback = Signal.New()
 
@@ -194,6 +240,36 @@ end
 
 Library.Signal = Signal
 
+function Library.TrackConnection(Connection)
+	table.insert(Library.Connections, Connection)
+	return Connection
+end
+
+function Library.DisconnectConnection(Connection)
+	if Connection and Connection.Connected then
+		Connection:Disconnect()
+	end
+
+	local Index = table.find(Library.Connections, Connection)
+	if Index then
+		table.remove(Library.Connections, Index)
+	end
+end
+
+function Library.DisconnectAllConnections()
+	for Index = #Library.Connections, 1, -1 do
+		Library.DisconnectConnection(Library.Connections[Index])
+	end
+end
+
+function Library.DisconnectAllSignals()
+	for _, SignalObject in ipairs(Library.Signals) do
+		SignalObject:DisconnectAll()
+	end
+
+	Library.Signals = {}
+end
+
 --// Themes
 ThemeManager.CurrentTheme = nil
 ThemeManager.ThemeChanged = Signal.New()
@@ -205,7 +281,7 @@ function ThemeManager.New(Data)
 	local Theme = setmetatable({
 		Name = Data.Name or "Theme",
 		BackgroundColor = Data.BackgroundColor or Color3.fromRGB(9, 9, 9),
-		BackgroundTransparency = Data.BackgroundTransparency or 0.1,
+		BackgroundTransparency = Library.Get(Data, { "BackgroundTransparency" }, 0.1),
 		AccentColor = Data.AccentColor or Color3.fromRGB(255, 255, 255),
 		TextColor = Data.TextColor or Color3.fromRGB(255, 255, 255),
 		IconColor = Data.IconColor or Color3.fromRGB(255, 255, 255),
@@ -408,6 +484,7 @@ function Library.DestroyAll()
 end
 
 function Library.SetupBody(Data)
+	Data = Data or {}
 	local Body = {}
 
 	local HoverStart = Signal.New()
@@ -636,8 +713,8 @@ function Library.NewSizeConstraint(Object, MaxX, MaxY, MinX, MinY)
 
 	local SizeConstraint = Library.New("UISizeConstraint", {
 		Parent = Object,
-		MaxSize = Vector2.new(MaxX or math.huge, MaxY or math.huge),
-		MinSize = Vector2.new(MinX or 0, MinY or 0),
+		MaxSize = Vector2.new(MaxX ~= nil and MaxX or math.huge, MaxY ~= nil and MaxY or math.huge),
+		MinSize = Vector2.new(MinX ~= nil and MinX or 0, MinY ~= nil and MinY or 0),
 	})
 
 	return SizeConstraint
@@ -683,7 +760,7 @@ function Library.SetDraggable(Object, Handle)
 		DragInputType = nil
 
 		if Connection then
-			Connection:Disconnect()
+			Library.DisconnectConnection(Connection)
 			Connection = nil
 		end
 
@@ -707,16 +784,16 @@ function Library.SetDraggable(Object, Handle)
 		DragStart:Fire(Object)
 
 		if Connection then
-			Connection:Disconnect()
+			Library.DisconnectConnection(Connection)
 		end
 
-		Connection = RunService.Heartbeat:Connect(function(DeltaTime)
+		Connection = Library.TrackConnection(RunService.Heartbeat:Connect(function(DeltaTime)
 			local Alpha = 1 - math.exp(-SmoothSpeed * DeltaTime)
 			Object.Position = Object.Position:Lerp(TargetPosition, Alpha)
-		end)
+		end))
 	end)
 
-	UserInputService.InputChanged:Connect(function(Input)
+	Library.TrackConnection(UserInputService.InputChanged:Connect(function(Input)
 		if
 			Dragging
 			and DragInputType
@@ -727,13 +804,13 @@ function Library.SetDraggable(Object, Handle)
 		then
 			Update(Input.Position)
 		end
-	end)
+	end))
 
-	UserInputService.InputEnded:Connect(function(Input)
+	Library.TrackConnection(UserInputService.InputEnded:Connect(function(Input)
 		if Dragging and Input.UserInputType == DragInputType then
 			StopDragging()
 		end
-	end)
+	end))
 
 	return {
 		DragStart = DragStart,
@@ -771,21 +848,23 @@ function Library:SetTheme(Theme)
 end
 
 function Library:CreateTheme(Data)
+	Data = Data or {}
 	local Theme = ThemeManager.New({
-		Name = Data and (Data.Name or Data.ThemeName) or "Unnamed Theme",
-		BackgroundColor = Data and Data.BackgroundColor or Color3.fromRGB(9, 9, 9),
-		BackgroundTransparency = Data and Data.BackgroundTransparency or 0.6,
-		AccentColor = Data and Data.AccentColor or Color3.fromRGB(255, 255, 255),
-		TextColor = Data and Data.TextColor or Color3.fromRGB(255, 255, 255),
-		IconColor = Data and Data.IconColor or Color3.fromRGB(255, 255, 255),
+		Name = Data.Name or Data.ThemeName or "Unnamed Theme",
+		BackgroundColor = Data.BackgroundColor or Color3.fromRGB(9, 9, 9),
+		BackgroundTransparency = Library.Get(Data, { "BackgroundTransparency" }, 0.1),
+		AccentColor = Data.AccentColor or Color3.fromRGB(255, 255, 255),
+		TextColor = Data.TextColor or Color3.fromRGB(255, 255, 255),
+		IconColor = Data.IconColor or Color3.fromRGB(255, 255, 255),
 	})
 
-	ThemeManager.Themes[Data.Name] = Theme
+	ThemeManager.Themes[Theme.Name] = Theme
 	return Theme
 end
 
 --// Background Animations
 function Library.SetupAnimation(Animation, Window, Data)
+	Data = Data or {}
 	Signal:Assert(
 		Animation and type(Animation) == "string",
 		"Animation is nil and/or is not a string",
@@ -801,24 +880,24 @@ function Library.SetupAnimation(Animation, Window, Data)
 	if Animation == "Parallax" then
 		local Config = {
 			LightHouse = {
-				Angle = Data.LightHouseAngle or 5,
-				Speed = Data.LightHouseSpeed or 1,
-				BobAmplitude = Data.LightHouseBobAmplitude or 0.008,
-				BobMultipliers = Data.LightHouseBobMultipliers or { 1, 1 },
-				TiltMultipliers = Data.LightHouseTiltMultipliers or { 1, 1 },
+				Angle = Library.Get(Data, { "LightHouseAngle" }, 5),
+				Speed = Library.Get(Data, { "LightHouseSpeed" }, 1),
+				BobAmplitude = Library.Get(Data, { "LightHouseBobAmplitude" }, 0.008),
+				BobMultipliers = Library.Get(Data, { "LightHouseBobMultipliers" }, { 1, 1 }),
+				TiltMultipliers = Library.Get(Data, { "LightHouseTiltMultipliers" }, { 1, 1 }),
 				PhaseStep = math.pi,
 				TiltPhaseOffset = (math.pi / 4),
-				X = Data.LightHouseXPositions or { 0.15, 0.75 },
-				Y = Data.LightHouseYPosition or 0.9,
+				X = Library.Get(Data, { "LightHouseXPositions" }, { 0.15, 0.75 }),
+				Y = Library.Get(Data, { "LightHouseYPosition" }, 0.9),
 			},
 
 			Wave = {
-				Amplitude = Data.WaveAmplitude or 0.04,
-				AmplitudeStep = Data.WaveAmplitudeStep or 0.1,
-				BaseSpeed = Data.WaveBaseSpeed or 0.9,
-				SpeedStep = Data.WaveSpeedStep or 0.4,
+				Amplitude = Library.Get(Data, { "WaveAmplitude" }, 0.04),
+				AmplitudeStep = Library.Get(Data, { "WaveAmplitudeStep" }, 0.1),
+				BaseSpeed = Library.Get(Data, { "WaveBaseSpeed" }, 0.9),
+				SpeedStep = Library.Get(Data, { "WaveSpeedStep" }, 0.4),
 				PhaseStep = ((2 * math.pi) / 3),
-				Height = Data.WaveHeight or 0.2,
+				Height = Library.Get(Data, { "WaveHeight" }, 0.2),
 			},
 		}
 
@@ -951,12 +1030,12 @@ function Library.SetupAnimation(Animation, Window, Data)
 			local TiltMultiplier = Config.LightHouse.TiltMultipliers[Index]
 				or Config.LightHouse.TiltMultipliers[#Config.LightHouse.TiltMultipliers]
 
-			local BobSpeed = Config.LightHouse.Speed * BobMultiplier
-			local BobAmplitude = Config.LightHouse.BobAmplitude * BobMultiplier
+			local BobSpeed = Config.LightHouse.Speed * BobMultiplier :: number
+			local BobAmplitude = Config.LightHouse.BobAmplitude * BobMultiplier :: number
 			local BobDuration = math.pi / BobSpeed
 
-			local TiltSpeed = Config.LightHouse.Speed * TiltMultiplier
-			local TiltAmplitude = Config.LightHouse.Angle * TiltMultiplier
+			local TiltSpeed = Config.LightHouse.Speed * TiltMultiplier :: number
+			local TiltAmplitude = Config.LightHouse.Angle * TiltMultiplier :: number
 			local TiltDuration = math.pi / TiltSpeed
 
 			local BasePosition = Instance.Position
@@ -1208,6 +1287,7 @@ end)
 
 --// Window
 function Library:Window(Data)
+	Data = Data or {}
 	local Controller, Body = {}, {}
 	local DragHoverStart = Signal.New()
 	local DragHoverEnd = Signal.New()
@@ -1219,7 +1299,7 @@ function Library:Window(Data)
 	local CloseThread = Signal.New()
 	local ActiveCloseThread = nil
 
-	local _UIScale = Library.New("UIScale", { Parent = UI, Scale = Data.UIScale or 1 }) :: UIScale
+	local _UIScale = Library.New("UIScale", { Parent = UI, Scale = Library.Get(Data, { "UIScale" }, 1) }) :: UIScale
 
 	Controller.SelectedTab = nil
 	Controller.SelectedContainer = nil
@@ -1227,15 +1307,15 @@ function Library:Window(Data)
 	Controller.OnDestroy = OnDestroy
 	Controller.OnMinimize = Minimize
 
-	Controller.MinimizeKeybind = Data.MinimizeKeybind or Enum.KeyCode.RightShift
-	Controller.IsMinimized = Data and (Data.IsMinimized or Data.Minimized) or false
+	Controller.MinimizeKeybind = Library.Get(Data, { "MinimizeKeybind" }, Enum.KeyCode.RightShift)
+	Controller.IsMinimized = Library.Get(Data, { "IsMinimized", "Minimized" }, false)
 	Controller.Minimizing = false
 
 	local Window = Library.New("Frame", {
 		Name = "Window",
 		Position = UDim2.new(0.5, 0, 0.5, 0),
 		Size = Data and (Data.WindowSize or Data.Size) or UDim2.new(0, 700, 0, 500),
-		BackgroundTransparency = ThemeManager.CurrentTheme.BackgroundTransparency or 0.1,
+		BackgroundTransparency = Library.Get(ThemeManager.CurrentTheme, { "BackgroundTransparency" }, 0.1),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Role = "Background",
 		BorderSizePixel = 0,
@@ -1325,7 +1405,8 @@ function Library:Window(Data)
 
 	Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.High), Parent = Window })
 	Controller.WindowSize = Data and (Data.WindowSize or Data.Size) or UDim2.new(0, 700, 0, 500)
-	Controller.WindowTransparency = ThemeManager.CurrentTheme.BackgroundTransparency or Window.BackgroundTransparency
+	Controller.WindowTransparency =
+		Library.Get(ThemeManager.CurrentTheme, { "BackgroundTransparency" }, Window.BackgroundTransparency)
 
 	Library.New("UIStroke", {
 		Transparency = 0.9,
@@ -1909,6 +1990,7 @@ function Library:Window(Data)
 
 	--// Tab
 	function Controller:Tab(Data)
+		Data = Data or {}
 		local Elements = {}
 
 		local Tab = Library.New("TextButton", {
@@ -2106,6 +2188,7 @@ function Library:Window(Data)
 
 		--// Elements
 		function Elements:Toggle(Data)
+			Data = Data or {}
 			local Methods = {}
 			local Body = Library.SetupBody({
 				Title = Data and (Data.Title or Data.Name) or "Toggle",
@@ -2156,7 +2239,7 @@ function Library:Window(Data)
 			local AnimateOn = Signal.New()
 			local AnimateOff = Signal.New()
 
-			local Value = Data.Value or Data.Toggled or false
+			local Value = Library.Get(Data, { "Value", "Toggled" }, false)
 			local CallbackOnLoad = Data and Data.CallbackOnLoad or false
 			local Callback = Signal:Callback(Data and Data.Callback)
 
@@ -2228,7 +2311,8 @@ function Library:Window(Data)
 				end
 			end
 
-			function Methods:Set(Value)
+			function Methods:Set(HValue)
+				Value = HValue
 				Callback:Fire(Value)
 
 				if Value then
@@ -2242,6 +2326,7 @@ function Library:Window(Data)
 		end
 
 		function Elements:Slider(Data)
+			Data = Data or {}
 			local Methods = {}
 			local Body = Library.SetupBody({
 				Title = Data and (Data.Title or Data.Name) or "Toggle",
@@ -2284,7 +2369,7 @@ function Library:Window(Data)
 				Name = "ValueText",
 				AutomaticSize = Enum.AutomaticSize.XY,
 				BackgroundTransparency = 1,
-				Text = tostring(Data.Value),
+				Text = tostring(Library.Get(Data, { "Value", "Default", "Min", "MinimumValue" }, 0)),
 				Role = "Text",
 				TextSize = 15,
 				TextTransparency = 0.2,
@@ -2321,11 +2406,11 @@ function Library:Window(Data)
 			Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.Low), Parent = Percent })
 
 			--// Logic
-			local Max = Data and (Data.Max or Data.MaximumValue) or 100
-			local Min = Data and (Data.Min or Data.MinimumValue) or 0
-			local Step = Data and (Data.Step or Data.Threshold) or 1
-			local Value = Data and (Data.Default or Data.Value) or Min
-			local SmoothSlide = Data and (Data.SmoothSlide or Data.Animate) or false
+			local Max = Library.Get(Data, { "Max", "MaximumValue" }, 100)
+			local Min = Library.Get(Data, { "Min", "MinimumValue" }, 0)
+			local Step = Library.Get(Data, { "Step", "Threshold" }, 1)
+			local Value = Library.Get(Data, { "Default", "Value" }, Min)
+			local SmoothSlide = Library.Get(Data, { "SmoothSlide", "Animate" }, false)
 
 			local Callback = Signal:Callback(Data and Data.Callback)
 			local Changed = Signal.New()
@@ -2421,7 +2506,7 @@ function Library:Window(Data)
 				ApplyValue(ValueFromAlpha(AlphaFromInput(Input.Position.X)), true)
 			end)
 
-			UserInputService.InputChanged:Connect(function(Input)
+			Library.TrackConnection(UserInputService.InputChanged:Connect(function(Input)
 				if not Dragging then
 					return
 				end
@@ -2432,9 +2517,9 @@ function Library:Window(Data)
 				then
 					ApplyValue(ValueFromAlpha(AlphaFromInput(Input.Position.X)), true)
 				end
-			end)
+			end))
 
-			UserInputService.InputEnded:Connect(function(Input)
+			Library.TrackConnection(UserInputService.InputEnded:Connect(function(Input)
 				if
 					Dragging
 					and (
@@ -2445,7 +2530,7 @@ function Library:Window(Data)
 					Dragging = false
 					DragEnd:Fire(Value)
 				end
-			end)
+			end))
 
 			task.delay(1, function()
 				local Alpha = AlphaFromValue(Value)
@@ -2493,12 +2578,13 @@ function Library:Window(Data)
 		end
 
 		function Elements:Button(Data)
+			Data = Data or {}
 			local Methods = {}
 			local Body = Library.SetupBody({
 				Title = Data and (Data.Title or Data.Name) or "Toggle",
 				Description = Data and (Data.Desc or Data.Description) or "Description",
 				Icon = Data and (Data.Icon or Data.Image) or "",
-				StrokeEnabled = Data and (Data.StrokeEnabled or Data.Stroke) or false,
+				StrokeEnabled = Library.Get(Data, { "StrokeEnabled", "Stroke" }, false),
 				Transparency = Data and (Data.Transparency or Data.TransparencyPhase) or "Min",
 				Parent = Container,
 			})
@@ -2606,16 +2692,17 @@ function Library:Window(Data)
 				Callback:Fire()
 			end
 
-			return Methods
+			return Methods, Body
 		end
 
 		function Elements:Dropdown(Data)
+			Data = Data or {}
 			local Methods = {}
 			local Body = Library.SetupBody({
 				Title = Data and (Data.Title or Data.Name) or "Toggle",
 				Description = Data and (Data.Desc or Data.Description) or "Description",
 				Icon = Data and (Data.Icon or Data.Image) or "",
-				StrokeEnabled = Data and (Data.StrokeEnabled or Data.Stroke) or false,
+				StrokeEnabled = Library.Get(Data, { "StrokeEnabled", "Stroke" }, false),
 				Transparency = Data and (Data.Transparency or Data.TransparencyPhase) or "Min",
 				Parent = Container,
 			})
@@ -2686,13 +2773,15 @@ function Library:Window(Data)
 					ImageTransparency = 0.2,
 					Parent = DropdownPlate,
 				})
+
+				Signal:Track(Icon)
 			end
 
 			--// Logic
 			local Values = Data and (Data.Values or Data.Table or Data.Index) or {}
-			local Value = Data and (Data.Value or Data.Default) or nil
-			local Multi = Data and (Data.Multi or Data.Multiple) or false
-			local CloseOnSelection = Data and (Data.CloseOnSelection or Data.CloseWhenSelected) or false
+			local Value = Library.Get(Data, { "Value", "Default" }, nil)
+			local Multi = Library.Get(Data, { "Multi", "Multiple" }, false)
+			local CloseOnSelection = Library.Get(Data, { "CloseOnSelection", "CloseWhenSelected" }, false)
 			local Callback = Signal:Callback(Data and Data.Callback)
 
 			local Selected = {}
@@ -2806,6 +2895,7 @@ function Library:Window(Data)
 				local Y = AbsolutePosition.Y + AbsoluteSize.Y + 60
 
 				local InputConnection
+				local ContextCloseThread
 				local Children = 0
 
 				for _, Child in pairs(Data) do
@@ -2834,7 +2924,7 @@ function Library:Window(Data)
 					Parent = ContextMenu,
 				})
 
-				InputConnection = UserInputService.InputBegan:Connect(function(Input)
+				InputConnection = Library.TrackConnection(UserInputService.InputBegan:Connect(function(Input)
 					if
 						Input.UserInputType == Enum.UserInputType.MouseButton1
 						or Input.UserInputType == Enum.UserInputType.Touch
@@ -2851,16 +2941,21 @@ function Library:Window(Data)
 						)
 
 						if IsOutside then
+							Library.DisconnectConnection(InputConnection)
+							InputConnection = nil
 							CloseThread:Fire()
-							InputConnection:Disconnect()
-							ActiveCloseThread:Disconnect()
 						end
 					end
-				end)
+				end))
 
 				Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.High), Parent = ContextMenu })
 
-				ActiveCloseThread = CloseThread:Connect(function()
+				ContextCloseThread = CloseThread:Connect(function()
+					if InputConnection then
+						Library.DisconnectConnection(InputConnection)
+						InputConnection = nil
+					end
+
 					for _, Button in ipairs(ContextMenu:GetChildren()) do
 						if Button:IsA("TextButton") then
 							Signal:Animate(
@@ -2880,7 +2975,17 @@ function Library:Window(Data)
 					end
 
 					ContextMenu:Destroy()
+
+					if ContextCloseThread then
+						ContextCloseThread:Disconnect()
+					end
+
+					if ActiveCloseThread == ContextCloseThread then
+						ActiveCloseThread = nil
+					end
 				end)
+
+				ActiveCloseThread = ContextCloseThread
 
 				if Children >= 8 then
 					ContextMenu.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -3052,12 +3157,13 @@ function Library:Window(Data)
 		end
 
 		function Elements:Keybind(Data)
+			Data = Data or {}
 			local Methods = {}
 			local Body = Library.SetupBody({
 				Title = Data and (Data.Title or Data.Name) or "Toggle",
 				Description = Data and (Data.Desc or Data.Description) or "Description",
 				Icon = Data and (Data.Icon or Data.Image) or "",
-				StrokeEnabled = Data and (Data.StrokeEnabled or Data.Stroke) or false,
+				StrokeEnabled = Library.Get(Data, { "StrokeEnabled", "Stroke" }, false),
 				Transparency = Data and (Data.Transparency or Data.TransparencyPhase) or "Min",
 				Parent = Container,
 			})
@@ -3114,7 +3220,7 @@ function Library:Window(Data)
 			})
 
 			--// Logic
-			local Value = Data and (Data.Value or Data.Default) or Enum.KeyCode.Asterisk
+			local Value = Library.Get(Data, { "Value", "Default" }, Enum.KeyCode.Asterisk)
 			local Callback = Signal:Callback(Data and Data.Callback)
 			local OnKeypressCalback = Signal:Callback(Data and (Data.KeyPressCallback or Data.OnKeyPressed))
 
@@ -3132,39 +3238,41 @@ function Library:Window(Data)
 					OnListenEnd:Fire(Value)
 
 					if ListeningConnection then
-						ListeningConnection:Disconnect()
+						Library.DisconnectConnection(ListeningConnection)
 					end
 				end
 
+				IsListening = true
 				local FireInput
 
 				BindName.Text = "Listening..."
 				BindName.TextTransparency = 0.4
 
-				ListeningConnection = UserInputService.InputBegan:Connect(function(Input, Procesed)
-					if Procesed then
-						return
-					end
+				ListeningConnection =
+					Library.TrackConnection(UserInputService.InputBegan:Connect(function(Input, Procesed)
+						if Procesed then
+							return
+						end
 
-					if
-						Signal:MatchInput(Input, Enum.UserInputType.MouseButton1)
-						or Signal:MatchInput(Input, Enum.UserInputType.MouseButton2)
-						or Signal:MatchInput(Input, Enum.UserInputType.MouseButton3)
-					then
-						FireInput = Input.UserInputType
-					elseif Input.KeyCode then
-						FireInput = Input.KeyCode
-					end
+						if
+							Signal:MatchInput(Input, Enum.UserInputType.MouseButton1)
+							or Signal:MatchInput(Input, Enum.UserInputType.MouseButton2)
+							or Signal:MatchInput(Input, Enum.UserInputType.MouseButton3)
+						then
+							FireInput = Input.UserInputType
+						elseif Input.KeyCode then
+							FireInput = Input.KeyCode
+						end
 
-					if FireInput then
-						OnListenEnd:Fire(FireInput)
-					end
-				end)
+						if FireInput then
+							OnListenEnd:Fire(FireInput)
+						end
+					end))
 			end)
 
 			OnListenEnd:Connect(function(Bind: Enum.KeyCode)
 				if ListeningConnection then
-					ListeningConnection:Disconnect()
+					Library.DisconnectConnection(ListeningConnection)
 					ListeningConnection = nil
 				end
 
@@ -3188,7 +3296,7 @@ function Library:Window(Data)
 				OnListenStart:Fire()
 			end)
 
-			UserInputService.InputBegan:Connect(function(Input, Procesed)
+			Library.TrackConnection(UserInputService.InputBegan:Connect(function(Input, Procesed)
 				if Procesed then
 					return
 				end
@@ -3196,7 +3304,7 @@ function Library:Window(Data)
 				if Signal:MatchInput(Input, Value) then
 					OnKeypressCalback:Fire()
 				end
-			end)
+			end))
 
 			function Methods:Set(Keybind)
 				Signal:Assert(
@@ -3220,6 +3328,8 @@ function Library:Window(Data)
 				BackgroundTransparency = 1,
 				Parent = Container,
 			})
+
+			Section:SetAttribute("Divider", true)
 
 			local SectionTitle = Library.New("TextLabel", {
 				Name = "SectionTitle",
@@ -3246,6 +3356,7 @@ function Library:Window(Data)
 				Size = UDim2.fromOffset(24, 24),
 				BackgroundTransparency = 1,
 				Image = Data and (Data.Icon or Data.Image) or "",
+				LayoutOrder = -1,
 				ImageTransparency = 0.2,
 				Parent = Section,
 			})
@@ -3271,13 +3382,100 @@ function Library:Window(Data)
 			return Methods, Section
 		end
 
+		function Elements:BodyLabel(Data)
+			local Methods = {}
+			local Body = Library.SetupBody({
+				Title = Data and (Data.Title or Data.Name) or "Toggle",
+				Description = "",
+				Icon = Data and (Data.Icon or Data.Image) or "",
+				StrokeEnabled = Library.Get(Data, { "StrokeEnabled", "Stroke" }, false),
+				Transparency = Data and (Data.Transparency or Data.TransparencyPhase) or "Min",
+				Parent = Container,
+			})
+
+			local Interaction = Body.Interaction
+			local ElementBody = Body.ElementBody
+			local Header = Body.Header
+
+			Header.Size = UDim2.fromScale(0.5, 0)
+			Interaction.Size = UDim2.fromScale(0.5, 0)
+
+			local Value = Library.New("TextLabel", {
+				Name = "Watermark",
+				Visible = true,
+				ZIndex = 1,
+				LayoutOrder = 0,
+				Position = UDim2.new(0, 0, 0, 0),
+				Size = UDim2.new(0, 0, 0, 0),
+				AnchorPoint = Vector2.new(0, 0),
+				AutomaticSize = Enum.AutomaticSize.XY,
+				BorderColor3 = Color3.fromRGB(0, 0, 0),
+				BorderSizePixel = 0,
+				ClipsDescendants = false,
+				BackgroundTransparency = 1,
+				Text = Library.Get(Data, { "Desc", "Description", "Value", "Text", "Name" }, "Value"),
+				Role = "Text",
+				TextSize = 16,
+				TextScaled = false,
+				TextTransparency = 0.6000000238418579,
+				TextWrapped = true,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextYAlignment = Enum.TextYAlignment.Center,
+				FontFace = Font.new("rbxassetid://16658221428", Enum.FontWeight.Medium, Enum.FontStyle.Normal),
+				Parent = Interaction,
+			})
+
+			function Methods:Set(Text)
+				Signal:Assert(
+					Text and type(Text) == "string",
+					"Argument is nil and/or is not a string",
+					"BodyLabel:Set"
+				)
+
+				Value.Text = Text
+			end
+
+			return Methods, Body
+		end
+
+		function Elements:Divider(Data)
+			local Methods = {}
+			local Divider = Library.New("TextButton", {
+				Name = "Divider",
+				Size = UDim2.new(1, 0, 0, 10),
+				BackgroundTransparency = 1,
+				Parent = Container,
+			})
+
+			Divider:SetAttribute("Divider", true)
+
+			Library.New("Frame", {
+				Name = "Line",
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.new(Data and Data.Size or 0.9, 0, 0, 1),
+				AnchorPoint = Vector2.new(0.5, 0),
+				Role = "Accent",
+				BackgroundTransparency = Data and Data.Transparency or 0.9,
+				Parent = Divider,
+				BorderSizePixel = 0,
+			})
+
+			function Methods:Set(Size)
+				Signal:Assert(Size and type(Size) == "number", "Argument is nil and/or is not a number", "Divider:Set")
+
+				Divider.Size = UDim2.new(Size, 0, 0, 0)
+			end
+
+			return Methods, Divider
+		end
+
 		function Elements:Paragraph(Data)
 			local Methods = {}
 			local Body = Library.SetupBody({
 				Title = Data and (Data.Title or Data.Name) or "Toggle",
 				Description = Data and (Data.Desc or Data.Description) or "Description",
 				Icon = Data and (Data.Icon or Data.Image) or "",
-				StrokeEnabled = Data and (Data.StrokeEnabled or Data.Stroke) or false,
+				StrokeEnabled = Library.Get(Data, { "StrokeEnabled", "Stroke" }, false),
 				Transparency = Data and (Data.Transparency or Data.TransparencyPhase) or "Min",
 				Parent = Container,
 			})
@@ -3327,12 +3525,13 @@ function Library:Window(Data)
 		end
 
 		function Elements:Section(Data)
+			Data = Data or {}
 			local Methods = {}
 			local Body = Library.SetupBody({
 				Title = Data and (Data.Title or Data.Name) or "Toggle",
 				Description = Data and (Data.Desc or Data.Description) or "Description",
 				Icon = Data and (Data.Icon or Data.Image) or "",
-				StrokeEnabled = Data and (Data.StrokeEnabled or Data.Stroke) or false,
+				StrokeEnabled = Library.Get(Data, { "StrokeEnabled", "Stroke" }, false),
 				Transparency = Data and (Data.Transparency or Data.TransparencyPhase) or "Min",
 				Parent = Container,
 			})
@@ -3340,6 +3539,23 @@ function Library:Window(Data)
 			local Interaction = Body.Interaction :: Frame
 			local Header = Body.Header :: Frame
 			local ElementBody = Body.ElementBody :: TextButton
+
+			local _Elements = Library.New("Frame", {
+				Name = "Elements",
+				Position = UDim2.new(0, 0, 0, 0),
+				Size = UDim2.new(1, 0, 0, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				Role = "Accent",
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				LayoutOrder = 10,
+				Parent = ElementBody,
+			}) :: Frame
+
+			local List = ElementBody:FindFirstChildOfClass("UIListLayout"):Clone()
+			List.Padding = UDim.new(0, Library.Get(Data, { "ElementPadding" }, 6))
+			List.Parent = _Elements
+			List.Wraps = true
 
 			ElementBody:FindFirstChildOfClass("UIListLayout").Wraps = true
 
@@ -3350,8 +3566,6 @@ function Library:Window(Data)
 			local Chevron = nil
 
 			if Class == "Toggle" then
-				--// Copy of toggle logic
-
 				Header.Size = UDim2.fromScale(0.8, 0)
 				Interaction.Size = UDim2.fromScale(0.18, 0)
 
@@ -3389,8 +3603,10 @@ function Library:Window(Data)
 				local AnimateOn = Signal.New()
 				local AnimateOff = Signal.New()
 
-				local Value = Data.Value or Data.Toggled or false
+				local Value = Library.Get(Data, { "Value", "Toggled" }, false)
 				local Callback = Signal:Callback(Data and Data.Callback)
+
+				local CornerSize = Library.Get(Data, { "ElementCornerSize" }, 5) :: Number
 
 				AnimateOn:Connect(function()
 					Signal:Animate(
@@ -3457,7 +3673,8 @@ function Library:Window(Data)
 					end
 				end
 
-				function Methods:Set(Value)
+				function Methods:Set(HValue)
+					Value = HValue
 					Callback:Fire(Value)
 
 					if Value then
@@ -3466,6 +3683,34 @@ function Library:Window(Data)
 						AnimateOff:Fire()
 					end
 				end
+			elseif Class == "Watermark" then
+				Header.Size = UDim2.fromScale(0.5, 0)
+				Interaction.Size = UDim2.fromScale(0.48, 0)
+
+				local Value = Library.New("TextLabel", {
+					Name = "Watermark",
+					Visible = true,
+					ZIndex = 1,
+					LayoutOrder = 0,
+					Position = UDim2.new(0, 0, 0, 0),
+					Size = UDim2.new(0, 0, 0, 0),
+					AnchorPoint = Vector2.new(0, 0),
+					AutomaticSize = Enum.AutomaticSize.XY,
+					BorderColor3 = Color3.fromRGB(0, 0, 0),
+					BorderSizePixel = 0,
+					ClipsDescendants = false,
+					BackgroundTransparency = 1,
+					Text = Library.Get(Data, { "Watermark", "Text", "Value" }, "Value"),
+					Role = "Text",
+					TextSize = 16,
+					TextScaled = false,
+					TextTransparency = 0.6000000238418579,
+					TextWrapped = true,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					TextYAlignment = Enum.TextYAlignment.Center,
+					FontFace = Font.new("rbxassetid://16658221428", Enum.FontWeight.Medium, Enum.FontStyle.Normal),
+					Parent = Interaction,
+				})
 			else
 				Library.New("ImageLabel", {
 					Name = "Chevron",
@@ -3485,7 +3730,7 @@ function Library:Window(Data)
 			local Open = Signal.New()
 			local Close = Signal.New()
 
-			local Opened = Data and Data.Opened or false
+			local Opened = Library.Get(Data, { "Opened" }, false)
 			local Animating = false
 
 			Open:Connect(function()
@@ -3494,6 +3739,7 @@ function Library:Window(Data)
 				end
 
 				Animating = true
+				_Elements.Visible = true
 
 				if Chevron then
 					Signal:Animate(
@@ -3503,7 +3749,23 @@ function Library:Window(Data)
 					)
 				end
 
-				for _, Element in ipairs(Body.ElementBody:GetChildren()) do
+				local Children = _Elements:GetChildren()
+				local Pending = 0
+
+				for _, Element in ipairs(Children) do
+					if Element:IsA("TextButton") then
+						Pending += 1
+					end
+				end
+
+				if Pending == 0 then
+					Animating = false
+					return
+				end
+
+				local Completed = 0
+
+				for _, Element in ipairs(Children) do
 					if Element:IsA("TextButton") then
 						local ExpandedHeight = Element:GetAttribute("ExpandedHeight")
 
@@ -3522,12 +3784,14 @@ function Library:Window(Data)
 						end
 
 						task.delay(0.1, function()
-							Animating = false
-						end)
+							Element.AutomaticSize = Enum.AutomaticSize.Y
+							Element.ClipsDescendants = false
+							Completed += 1
 
-						task.wait(0.1)
-						Tab.AutomaticSize = Enum.AutomaticSize.Y
-						Tab.ClipsDescendants = false
+							if Completed >= Pending then
+								Animating = false
+							end
+						end)
 					end
 				end
 			end)
@@ -3536,6 +3800,7 @@ function Library:Window(Data)
 				if Animating then
 					return
 				end
+
 				Animating = true
 
 				if Chevron then
@@ -3546,7 +3811,24 @@ function Library:Window(Data)
 					)
 				end
 
-				for _, Element in ipairs(ElementBody:GetChildren()) do
+				local Children = _Elements:GetChildren()
+				local Pending = 0
+
+				for _, Element in ipairs(Children) do
+					if Element:IsA("TextButton") and Element.AbsoluteSize.Y then
+						Pending += 1
+					end
+				end
+
+				if Pending == 0 then
+					_Elements.Visible = false
+					Animating = false
+					return
+				end
+
+				local Completed = 0
+
+				for _, Element in ipairs(Children) do
 					if Element:IsA("TextButton") then
 						local AbsoluteSizeY = Element.AbsoluteSize.Y
 
@@ -3563,11 +3845,14 @@ function Library:Window(Data)
 							)
 
 							task.delay(0.1, function()
-								Animating = false
-							end)
+								Element.Visible = false
+								Completed += 1
 
-							task.wait(0.1)
-							Element.Visible = false
+								if Completed >= Pending then
+									_Elements.Visible = false
+									Animating = false
+								end
+							end)
 						end
 					end
 				end
@@ -3592,16 +3877,15 @@ function Library:Window(Data)
 			end)
 
 			local function GetElements()
-				local Children, Bodies = 0, {}
+				local Bodies = {}
 
-				for _, Element in ipairs(ElementBody:GetChildren()) do
+				for _, Element in ipairs(_Elements:GetChildren()) do
 					if Element:IsA("TextButton") then
-						Children = Children + 1
 						table.insert(Bodies, Element)
 					end
 				end
 
-				return Children, Bodies
+				return #Bodies, Bodies
 			end
 
 			local function SetChildrenCorners()
@@ -3613,22 +3897,53 @@ function Library:Window(Data)
 						if Corner then
 							if Children == 2 then
 								if Index == 1 then
-									Corner.BottomLeftRadius = UDim.new(0, 5)
-									Corner.BottomRightRadius = UDim.new(0, 5)
+									Corner.TopLeftRadius = UDim.new(0, 15)
+									Corner.TopRightRadius = UDim.new(0, 15)
+									Corner.BottomLeftRadius = UDim.new(0, CornerSize)
+									Corner.BottomRightRadius = UDim.new(0, CornerSize)
 								elseif Index == 2 then
-									Corner.TopLeftRadius = UDim.new(0, 5)
-									Corner.TopRightRadius = UDim.new(0, 5)
+									Corner.BottomLeftRadius = UDim.new(0, 15)
+									Corner.BottomRightRadius = UDim.new(0, 15)
+									Corner.TopLeftRadius = UDim.new(0, CornerSize)
+									Corner.TopRightRadius = UDim.new(0, CornerSize)
 								end
 							elseif Children > 2 then
 								if Index == 1 then
-									Corner.BottomLeftRadius = UDim.new(0, 5)
-									Corner.BottomRightRadius = UDim.new(0, 5)
+									Corner.TopLeftRadius = UDim.new(0, 15)
+									Corner.TopRightRadius = UDim.new(0, 15)
+									Corner.BottomLeftRadius = UDim.new(0, CornerSize)
+									Corner.BottomRightRadius = UDim.new(0, CornerSize)
 								elseif Index > 1 and Index < Children then
-									Corner.CornerRadius = UDim.new(0, 5)
+									Corner.CornerRadius = UDim.new(0, CornerSize)
 								elseif Index == Children then
-									Corner.TopLeftRadius = UDim.new(0, 5)
-									Corner.TopRightRadius = UDim.new(0, 5)
+									Corner.BottomLeftRadius = UDim.new(0, 15)
+									Corner.BottomRightRadius = UDim.new(0, 15)
+									Corner.TopLeftRadius = UDim.new(0, CornerSize)
+									Corner.TopRightRadius = UDim.new(0, CornerSize)
 								end
+							end
+						end
+					end
+				end
+
+				for Index, Object in ipairs(Bodies) do
+					if Object:GetAttribute("Divider") == true then
+						local Above = Bodies[Index - 1]
+						local Below = Bodies[Index + 1]
+
+						if Above then
+							local Corner = Above:FindFirstChildOfClass("UICorner")
+							if Corner then
+								Corner.BottomLeftRadius = UDim.new(0, 15)
+								Corner.BottomRightRadius = UDim.new(0, 15)
+							end
+						end
+
+						if Below then
+							local Corner = Below:FindFirstChildOfClass("UICorner")
+							if Corner then
+								Corner.TopLeftRadius = UDim.new(0, 15)
+								Corner.TopRightRadius = UDim.new(0, 15)
 							end
 						end
 					end
@@ -3636,100 +3951,155 @@ function Library:Window(Data)
 			end
 
 			function Methods:Toggle(Args)
+				Args = Args or {}
 				local Element, _Body = Elements:Toggle({
-					Title = Args and (Args.Title or Args.Name) or "Toggle",
-					Description = Args and (Args.Desc or Args.Description) or "Description",
-					StrokeEnabled = Args and (Args.StrokeEnabled or Args.Stroke) or false,
-					Icon = Args and (Args.Icon or Args.Image) or "",
-					Transparency = Args and (Args.Transparency or Args.TransparencyPhase) or "Min",
-					Value = Args and (Args.Value or Args.Default) or false,
+					Title = Args.Title or Args.Name or "Toggle",
+					Description = Args.Desc or Args.Description or "Description",
+					StrokeEnabled = Library.Get(Args, { "StrokeEnabled", "Stroke" }, false),
+					Icon = Args.Icon or Args.Image or "",
+					Transparency = Args.Transparency or Args.TransparencyPhase or "Min",
+					Value = Library.Get(Args, { "Value", "Default" }, false),
 					Callback = Args.Callback,
 				})
 
-				_Body.ElementBody.Parent = Body.ElementBody
+				_Body.ElementBody.Parent = _Elements
+				return Element
+			end
+
+			function Methods:Button(Args)
+				Args = Args or {}
+				local Element, _Body = Elements:Button({
+					Title = Args.Title or Args.Name or "Button",
+					Description = Args.Desc or Args.Description or "Description",
+					Icon = Args.Icon or Args.Image or "",
+					ButtonClass = Args.ButtonClass or Args.HeadingButton or "Icon",
+					ButtonIcon = Args.ButtonIcon or Args.HeadingIcon,
+					ButtonText = Args.ButtonText or Args.HeadingText,
+					StrokeEnabled = Library.Get(Args, { "StrokeEnabled", "Stroke" }, false),
+					Transparency = Args.Transparency or Args.TransparencyPhase or "Min",
+					Callback = Args.Callback,
+				})
+
+				_Body.ElementBody.Parent = _Elements
 				return Element
 			end
 
 			function Methods:Slider(Args)
+				Args = Args or {}
 				local Element, _Body = Elements:Slider({
-					Title = Args and (Args.Title or Args.Name) or "Toggle",
-					Description = Args and (Args.Desc or Args.Description) or "Description",
-					Icon = Args and (Args.Icon or Args.Image) or "",
-					Max = Args and (Args.Max or Args.MaximumValue) or 0,
-					Min = Args and (Args.Min or Args.MinimumValue) or 0,
-					Step = Args and (Args.Step or Args.Threshold) or 0,
-					Value = Args and (Args.Value or Args.Default) or (Args.Min or Args.MinimumValue) or 0,
-					StrokeEnabled = Args and (Args.StrokeEnabled or Args.Stroke) or false,
-					SmoothSlide = Args and (Args.SmoothSlide or Args.SmoothSlider) or false,
-					Transparency = Args and (Args.Transparency or Args.TransparencyPhase) or "Min",
+					Title = Args.Title or Args.Name or "Toggle",
+					Description = Args.Desc or Args.Description or "Description",
+					Icon = Args.Icon or Args.Image or "",
+					Max = Library.Get(Args, { "Max", "MaximumValue" }, 0),
+					Min = Library.Get(Args, { "Min", "MinimumValue" }, 0),
+					Step = Library.Get(Args, { "Step", "Threshold" }, 0),
+					Value = Library.Get(Args, { "Value", "Default", "Min", "MinimumValue" }, 0),
+					StrokeEnabled = Library.Get(Args, { "StrokeEnabled", "Stroke" }, false),
+					SmoothSlide = Library.Get(Args, { "SmoothSlide", "SmoothSlider" }, false),
+					Transparency = Args.Transparency or Args.TransparencyPhase or "Min",
 					Callback = Args.Callback,
 				})
 
-				_Body.ElementBody.Parent = Body.ElementBody
+				_Body.ElementBody.Parent = _Elements
 				return Element
 			end
 
 			function Methods:Dropdown(Args)
+				Args = Args or {}
 				local Element, _Body = Elements:Dropdown({
-					Title = Args and (Args.Title or Args.Name) or "Toggle",
-					Description = Args and (Args.Desc or Args.Description) or "Description",
-					Icon = Args and (Args.Icon or Args.Image) or "",
-					Multi = Args and (Args.Multi or Args.Multiple) or false,
-					Values = Args and (Args.Values or Args.Table) or {},
-					Value = Args and (Args.Value or Args.Default) or nil,
-					StrokeEnabled = Args and (Args.StrokeEnabled or Args.Stroke) or false,
-					Transparency = Args and (Args.Transparency or Args.TransparencyPhase) or "Min",
-					DropdownIcon = Args and Args.DropdownIcon or "",
+					Title = Args.Title or Args.Name or "Toggle",
+					Description = Args.Desc or Args.Description or "Description",
+					Icon = Args.Icon or Args.Image or "",
+					Multi = Library.Get(Args, { "Multi", "Multiple" }, false),
+					Values = Args.Values or Args.Table or {},
+					Value = Library.Get(Args, { "Value", "Default" }, nil),
+					StrokeEnabled = Library.Get(Args, { "StrokeEnabled", "Stroke" }, false),
+					Transparency = Args.Transparency or Args.TransparencyPhase or "Min",
+					DropdownIcon = Args.DropdownIcon or "",
 					Callback = Args.Callback,
 				})
 
-				_Body.ElementBody.Parent = Body.ElementBody
+				_Body.ElementBody.Parent = _Elements
 				return Element
 			end
 
 			function Methods:Keybind(Args)
+				Args = Args or {}
 				local Element, _Body = Elements:Keybind({
 					Title = Args and (Args.Title or Args.Name) or "Toggle",
 					Description = Args and (Args.Desc or Args.Description) or "Description",
 					Icon = Args and (Args.Icon or Args.Image) or "",
-					Value = Args and (Args.Value or Args.Default) or Enum.KeyCode.Asterisk,
-					StrokeEnabled = Args and (Args.StrokeEnabled or Args.Stroke) or false,
+					Value = Library.Get(Args, { "Value", "Default" }, Enum.KeyCode.Asterisk),
+					StrokeEnabled = Library.Get(Args, { "StrokeEnabled", "Stroke" }, false),
 					Transparency = Args and (Args.Transparency or Args.TransparencyPhase) or "Min",
 					KeyPressCallback = Args and Args.OnKeyPressCallback or function() end,
 					Callback = Args and Args.Callback or function() end,
 				})
 
-				_Body.ElementBody.Parent = Body.ElementBody
+				_Body.ElementBody.Parent = _Elements
 				return Element
 			end
 
 			function Methods:Label(Args)
+				Args = Args or {}
 				local Element, _Body = Elements:Label({
 					Title = Args and (Args.Title or Args.Name) or "Label",
-					TextSize = Args and Args.TextSize or 20,
+					TextSize = Library.Get(Args, { "TextSize" }, 20),
 					Icon = Args and (Args.Icon or Args.Image) or "",
 				})
 
-				_Body.Parent = Body.ElementBody
+				Library.New("UIPadding", {
+					Parent = _Body,
+					PaddingTop = UDim.new(0, 5),
+					PaddingBottom = UDim.new(0, 5),
+				})
+
+				_Body.Parent = _Elements
+				return Element
+			end
+
+			function Methods:BodyLabel(Args)
+				Args = Args or {}
+				local Element, _Body = Elements:BodyLabel({
+					Title = Args.Title or Args.Name or "Body Label",
+					Icon = Args.Icon or Args.Image or "",
+					Value = Library.Get(Args, { "Value", "Desc", "Description", "Text", "Name" }, "Value"),
+					StrokeEnabled = Library.Get(Args, { "StrokeEnabled", "Stroke" }, false),
+					Transparency = Args.Transparency or Args.TransparencyPhase or "Min",
+				})
+
+				_Body.ElementBody.Parent = _Elements
 				return Element
 			end
 
 			function Methods:Paragraph(Args)
+				Args = Args or {}
 				local Element, _Body = Elements:Paragraph({
 					Title = Args and (Args.Title or Args.Name) or "Toggle",
 					Description = Args and (Args.Desc or Args.Description) or "Description",
 					Icon = Args and (Args.Icon or Args.Image) or "",
-					StrokeEnabled = Args and (Args.StrokeEnabled or Args.Stroke) or false,
+					StrokeEnabled = Library.Get(Args, { "StrokeEnabled", "Stroke" }, false),
 					Transparency = Args and (Args.Transparency or Args.TransparencyPhase) or "Min",
 				})
 
-				_Body.ElementBody.Parent = Body.ElementBody
+				_Body.ElementBody.Parent = _Elements
+				return Element
+			end
+
+			function Methods:Divider(Args)
+				Args = Args or {}
+				local Element, _Body = Elements:Divider({
+					Size = Args.Size or 0.9,
+					Transparency = Args.Transparency or 0.9,
+				})
+
+				_Body.Parent = _Elements
 				return Element
 			end
 
 			SetChildrenCorners()
 
-			ElementBody.ChildAdded:Connect(function(Child)
+			_Elements.ChildAdded:Connect(function(Child)
 				if Child:IsA("TextButton") then
 					SetChildrenCorners()
 				end
@@ -3752,6 +4122,7 @@ function Library:Window(Data)
 
 	--// Section
 	function Controller:Section(Data)
+		Data = Data or {}
 		local TabController = {}
 		local Section = Library.New("Frame", {
 			Name = "Section",
@@ -3866,7 +4237,7 @@ function Library:Window(Data)
 
 		local Open = Signal.New()
 		local Close = Signal.New()
-		local Opened = Data and Data.Opened or false
+		local Opened = Library.Get(Data, { "Opened" }, false)
 
 		local Animating = false
 		local Debounce = 0.05
@@ -4025,6 +4396,28 @@ function Library:Window(Data)
 		return TabController
 	end
 
+	function Controller:Divider(Data)
+		local Divider = Library.New("Frame", {
+			Name = "Divider",
+			Size = UDim2.new(1, 0, 0, 10),
+			BackgroundTransparency = 1,
+			Parent = Tabs,
+		})
+
+		Library.New("Frame", {
+			Name = "Line",
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.new(Data and Data.Size or 0.9, 0, 0, 1),
+			AnchorPoint = Vector2.new(0.5, 0),
+			Role = "Accent",
+			BackgroundTransparency = Data and Data.Transparency or 0.9,
+			Parent = Divider,
+			BorderSizePixel = 0,
+		})
+
+		return Divider
+	end
+
 	function Controller:SetBackgroundImage(Image)
 		Signal:Assert(Image and type(Image) == "string", "Argument is nil and/or is not a string", "SetBackgroundImage")
 		BackgroundImage.Image = Image
@@ -4041,6 +4434,7 @@ function Library:Window(Data)
 	end
 
 	function Controller:NewTopbarButton(Data)
+		Data = Data or {}
 		local Button = Library.New("TextButton", {
 			Name = "Button",
 			Size = UDim2.new(0, 30, 0, 30),
@@ -4101,6 +4495,7 @@ function Library:Window(Data)
 	end
 
 	function Controller:NewInteractionButton(Data)
+		Data = Data or {}
 		local InteractionButton = Library.New("TextButton", {
 			Name = "Button",
 			LayoutOrder = Data.Order,
@@ -4126,7 +4521,7 @@ function Library:Window(Data)
 			Parent = InteractionButton,
 		})
 
-		local Callback = Signal.New()
+		local Callback = Signal:Callback(Data and Data.Callback)
 		local HoverStart = Signal.New()
 		local HoverEnd = Signal.New()
 
@@ -4154,7 +4549,9 @@ function Library:Window(Data)
 			HoverEnd:Fire()
 		end)
 
-		Callback:Connect(Data.Callback)
+		InteractionButton.MouseButton1Click:Connect(function()
+			Callback:Fire()
+		end)
 
 		return InteractionButton
 	end
@@ -4172,14 +4569,14 @@ function Library:Window(Data)
 	end
 
 	function Controller:SetUIScale(Scale)
-		Signal:Assert(Scale and type(Scale) == "number", "Argument is nil and/or is not a number", "SetUIScale")
+		Signal:Assert(Scale ~= nil and type(Scale) == "number", "Argument is nil and/or is not a number", "SetUIScale")
 
 		_UIScale.Scale = Scale
 	end
 
 	function Controller:SetWindowTransparency(Transparency)
 		Signal:Assert(
-			Transparency and type(Transparency) == "number",
+			Transparency ~= nil and type(Transparency) == "number",
 			"Argument is nil and/or is not a number",
 			"SetWindowTransparency"
 		)
@@ -4211,6 +4608,11 @@ function Library:Window(Data)
 	end
 
 	function Controller:Destroy()
+		if Controller.Destroyed then
+			return
+		end
+
+		Controller.Destroyed = true
 		OnDestroy:Fire()
 	end
 
@@ -4466,7 +4868,7 @@ function Library:Window(Data)
 		end)
 	end)
 
-	UserInputService.InputBegan:Connect(function(Input, Procesed)
+	Library.TrackConnection(UserInputService.InputBegan:Connect(function(Input, Procesed)
 		if Procesed then
 			return
 		end
@@ -4478,7 +4880,7 @@ function Library:Window(Data)
 				Controller:MinimizeWindow()
 			end
 		end
-	end)
+	end))
 
 	if Controller.IsMinimized then
 		Controller:MinimizeWindow()
@@ -4493,6 +4895,7 @@ end
 
 --// Notification
 function Library:Notify(Data)
+	Data = Data or {}
 	local Notification = Library.New("Frame", {
 		Name = "Notification",
 		ZIndex = 1,
@@ -4731,6 +5134,17 @@ function Library:Notify(Data)
 			Parent = ButtonLayout,
 		})
 
+		Library.New("UIListLayout", {
+			Name = "UIListLayout",
+			FillDirection = Enum.FillDirection.Horizontal,
+			HorizontalAlignment = Enum.HorizontalAlignment.Left,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Padding = UDim.new(0, 6),
+			ItemLineAlignment = Enum.ItemLineAlignment.Automatic,
+			Parent = Buttons,
+		})
+
 		for Index, Value in ipairs(Data.Buttons) do
 			local NotificationButton = Library.New("TextButton", {
 				Name = "NotificationButton",
@@ -4792,17 +5206,6 @@ function Library:Notify(Data)
 				Padding = UDim.new(0, 4),
 				ItemLineAlignment = Enum.ItemLineAlignment.Automatic,
 				Parent = NotificationButton,
-			})
-
-			Library.New("UIListLayout", {
-				Name = "UIListLayout",
-				FillDirection = Enum.FillDirection.Horizontal,
-				HorizontalAlignment = Enum.HorizontalAlignment.Left,
-				VerticalAlignment = Enum.VerticalAlignment.Center,
-				SortOrder = Enum.SortOrder.LayoutOrder,
-				Padding = UDim.new(0, 6),
-				ItemLineAlignment = Enum.ItemLineAlignment.Automatic,
-				Parent = Buttons,
 			})
 
 			NotificationButton.MouseEnter:Connect(function()
@@ -4903,12 +5306,13 @@ function Library:Notify(Data)
 end
 
 OnDestroy:Connect(function()
-	Signal:DisconnectAll()
+	Library.DisconnectAllConnections()
+	Library.DisconnectAllSignals()
 	Library.DestroyAll()
 end)
 
 task.delay(0.5, function()
-	Library:SetTheme(ThemeManager.CurrentTheme)
+	Library:SetTheme(ThemeManager.CurrentTheme.Name)
 end)
 
 return Library
