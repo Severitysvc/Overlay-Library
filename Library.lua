@@ -61,6 +61,7 @@ if Global.OverlayInjected then
 	Global.OverlayDestroy:Fire() --// TODO: Add Prompt
 end
 
+
 --// Signal Methods
 function Signal.New()
 	local self = setmetatable({}, Signal)
