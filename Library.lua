@@ -1,33 +1,21 @@
 --[[
 	// Overlay Library 
 	// Made By: Severitysvc
+	// Version: 1.0.5
+	// State: Beta
 ]]
 
---// Library
+--// Modules
 local Library = {}
 Library.Instances = {}
 Library.Connections = {}
 Library.Signals = {}
-Library.LibraryDebugs = true
-Library.Hidden = false
 
---// Signal
 local Signal = {}
 Signal.__index = Signal
 
---// ThemeManager
 local ThemeManager = {}
 ThemeManager.__index = ThemeManager
-
-function Library.Get(Data, Keys, Default)
-	for _, Key in ipairs(Keys) do
-		if Data[Key] ~= nil then
-			return Data[Key]
-		end
-	end
-
-	return Default
-end
 
 --// Services
 local CloneReference = cloneref or clonereference or function(Object)
@@ -41,27 +29,92 @@ local UserInputService = CloneReference(game:GetService("UserInputService")) :: 
 
 local LocalPlayer = CloneReference(Players.LocalPlayer) :: Player
 
---// Checks
-Library.IsStudio = RunService:IsStudio()
-Library.IsMobile = UserInputService.TouchEnabled and true or false
+Library.IsStudio = RunService:IsStudio() :: boolean
+Library.IsMobile = UserInputService.TouchEnabled and true or false :: boolean
 
---// Executor Utils
 local Hui = (Library.IsStudio and game:GetService("Players").LocalPlayer.PlayerGui)
 	or (gethui and gethui())
-	or CloneReference(game:GetService("CoreGui"))
+	or CloneReference(game:GetService("CoreGui")) :: CoreGui
 local Protect = Library.IsStudio and (protectgui or syn and syn.protectgui) or function() end
 local Global = Library.IsStudio and shared or getgenv()
 
 Library.CloneReference = CloneReference
-Library.InitializedPlayer = LocalPlayer
+Library.Player = LocalPlayer
 Library.Hui = Hui
 
---// Exists Check
+Library.Signal = Signal
+Library.Global = Global
+
 if Global.OverlayInjected then
-	Global.OverlayDestroy:Fire() --// TODO: Add Prompt
+	Global.OverlayDestroy:Fire()
 end
 
---// Signal Methods
+--// Icons
+local API = not Library.IsStudio
+		and loadstring(game:HttpGetAsync("https://raw.githubusercontent.com/Footagesus/Icons/main/Main-v2.lua"))() --// Creds: https://github.com/Footagesus/Icons
+	or {
+		SetIconsType = function(Object)
+			return Object
+		end,
+
+		GetIcon = function()
+			return ""
+		end,
+	}
+
+function Library.GetIcon(Icon)
+	if Icon and type(Icon) == "string" and (string.find(Icon, "rbxassetid") or string.find(Icon, "rbxthumb")) then
+		return Icon
+	end
+
+	local Icon = API.GetIcon and API.GetIcon(tostring(Icon):lower()) or ""
+
+	if not Icon then
+		return ""
+	end
+
+	return Icon
+end
+
+function Library.SetIcon(Icon, Label)
+	local IconData = Library.GetIcon(Icon)
+
+	if IconData then
+		Label.Image = IconData
+	end
+
+	return nil
+end
+
+function Library.Get(Data, Keys, Default)
+	if Data == nil then
+		return Default
+	end
+
+	for _, Key in ipairs(Keys) do
+		if Data[Key] ~= nil then
+			return Data[Key]
+		end
+
+		if type(Key) == "string" then
+			local LowerKey = string.lower(Key)
+
+			for DataKey, Value in pairs(Data) do
+				if type(DataKey) == "string" and string.lower(DataKey) == LowerKey then
+					return Value
+				end
+			end
+		end
+	end
+
+	return Default
+end
+
+function Library:SetIconPack(Pack)
+	API.SetIconsType(Pack or "Lucide")
+end
+
+--// Signal
 function Signal.New()
 	local self = setmetatable({}, Signal)
 	self.Connections = {}
@@ -118,48 +171,41 @@ function Signal:DisconnectAll()
 	self.Connections = {}
 end
 
-function Signal:Debug(Input, Thread)
-	if Library.LibraryDebugs then
-		warn("[Library, " .. tostring(Thread) .. "]: ", tostring(Input))
-	end
-end
-
 function Signal:Assert(Condition, Text, Thread)
 	if Condition then
 		return true
 	end
 
-	local Source = "unknown source"
-	local Line = "?"
-	local FunctionName = "anonymous"
+	if Library.LibraryDebugs then
+		local Source, Line, Function = nil, nil, nil
 
-	if debug and type(debug.info) == "function" then
-		local Success, CallerSource, CallerLine, CallerName = pcall(debug.info, 2, "sln")
+		if debug and type(debug.info) == "function" then
+			local Success, CSource, CLine, CName = pcall(debug.info, 2, "sln")
 
-		if Success then
-			Source = CallerSource or Source
-			Line = CallerLine or Line
-			FunctionName = CallerName or FunctionName
+			if Success then
+				Source = CSource or "unknown"
+				Line = CLine or "?"
+				Function = CName or "anonymous"
+			end
 		end
+		error(
+			("[Overlay Error] %s\n  Context: %s\n  Function: %s\n  Location: %s:%s"):format(
+				tostring(Text or "No error set."),
+				tostring(Thread or "Thread"),
+				Function,
+				Source,
+				Line
+			),
+			2
+		)
 	end
-
-	error(
-		("[Overlay Error] %s\n  Context: %s\n  Function: %s\n  Location: %s:%s"):format(
-			tostring(Text or "No error set."),
-			tostring(Thread or "Thread"),
-			FunctionName,
-			Source,
-			Line
-		),
-		2
-	)
 end
 
 function Signal:MatchInput(Input, ...)
-	local Targets = { ... }
+	local Inputs = { ... }
 
-	for _, Target in ipairs(Targets) do
-		if Input.KeyCode == Target or Input.UserInputType == Target then
+	for _, _Input in ipairs(Inputs) do
+		if Input.KeyCode == _Input or Input.UserInputType == _Input then
 			return true
 		end
 	end
@@ -168,6 +214,8 @@ function Signal:MatchInput(Input, ...)
 end
 
 function Signal:Animate(Object, Info, Propriety)
+	Signal:Assert(Object and typeof(Object) == "Instance", "Object is nil and/or is not an instance", "Track")
+
 	local TweenInfo = TweenInfo.new(
 		Info.Time,
 		Info.Style,
@@ -187,37 +235,37 @@ function Signal:Animate(Object, Info, Propriety)
 	}
 end
 
-function Signal:Track(Object, OptionalTarget)
-	Signal:Assert(Object, "Object is nil", "Track")
+function Signal:Track(Object, Optional)
+	Signal:Assert(Object and typeof(Object) == "Instance", "Object is nil and/or is not an instance", "Track")
 
-	local IsTextObject = Object:IsA("TextLabel") or Object:IsA("TextButton") or Object:IsA("TextBox")
-	local IsImageObject = Object:IsA("ImageLabel") or Object:IsA("ImageButton")
+	local TextObject = Object:IsA("TextLabel") or Object:IsA("TextButton") or Object:IsA("TextBox")
+	local ImageObject = Object:IsA("ImageLabel") or Object:IsA("ImageButton")
 
-	Signal:Assert(IsTextObject or IsImageObject, "Object is not a TextLabel or ImageLabel", "Track")
+	Signal:Assert(TextObject or ImageObject, "Object is not a TextLabel or ImageLabel", "Track")
 
-	local Content = IsTextObject and Object.Text or Object.Image
+	local Content = TextObject and Object.Text or Object.Image
 	Object.Visible = Content ~= nil and Content ~= ""
 
-	if OptionalTarget then
-		OptionalTarget.Visible = Content ~= nil and Content ~= ""
+	if Optional then
+		Optional.Visible = Content ~= nil and Content ~= ""
 	end
 
-	if IsTextObject then
+	if TextObject then
 		Object:GetPropertyChangedSignal("Text"):Connect(function()
-			local Content = IsTextObject and Object.Text or Object.Image
+			local Content = TextObject and Object.Text
 			Object.Visible = Content ~= nil and Content ~= ""
 
-			if OptionalTarget then
-				OptionalTarget.Visible = Content ~= nil and Content ~= ""
+			if Optional then
+				Optional.Visible = Content ~= nil and Content ~= ""
 			end
 		end)
 	else
 		Object:GetPropertyChangedSignal("Image"):Connect(function()
-			local Content = IsTextObject and Object.Text or Object.Image
+			local Content = ImageObject and Object.Image
 			Object.Visible = Content ~= nil and Content ~= ""
 
-			if OptionalTarget then
-				OptionalTarget.Visible = Content ~= nil and Content ~= ""
+			if Optional then
+				Optional.Visible = Content ~= nil and Content ~= ""
 			end
 		end)
 	end
@@ -237,8 +285,6 @@ function Signal:Callback(Func)
 
 	return Callback
 end
-
-Library.Signal = Signal
 
 function Library.TrackConnection(Connection)
 	table.insert(Library.Connections, Connection)
@@ -414,16 +460,16 @@ ThemeManager.Themes = {
 
 ThemeManager.CurrentTheme = ThemeManager.Themes.Dark
 
---// Library Methods
-function Library.SetLibraryDebugs(Bool)
+--// Library
+function Library:SetLibraryDebugs(Bool)
 	Library.LibraryDebugs = Bool
 end
 
-function Library.SetHidden(Bool)
+function Library:SetHidden(Bool)
 	Library.Hidden = Bool
 end
 
-function Library.SetGlobal(Name, Value)
+function Library:SetGlobal(Name, Value)
 	Signal:Assert(Global, "Global is nil", "SetGlobal")
 	Global[Name] = Value
 end
@@ -440,11 +486,11 @@ function Library.New(Class, Properties)
 		Properties.Role = nil
 
 		for Property, Value in pairs(Properties) do
-			local SetSuccess = pcall(function()
+			local Success = pcall(function()
 				Object[Property] = Value
 			end)
 
-			if not SetSuccess and Property ~= "Ignore" then
+			if not Success and (Property ~= "Ignore" and Property ~= "Role" and Property ~= "Icon") then
 				warn("Failed to set property: " .. tostring(Property))
 			end
 		end
@@ -467,6 +513,9 @@ function Library.New(Class, Properties)
 		Object.AutoButtonColor = false
 	elseif Class == "ImageButton" then
 		Object.AutoButtonColor = false
+		Library.SetIcon(Properties.Icon or "", Object)
+	elseif Class == "ImageLabel" then
+		Library.SetIcon(Properties.Icon or "", Object)
 	end
 
 	table.insert(Library.Instances, Object)
@@ -498,10 +547,10 @@ function Library.SetupBody(Data)
 		Role = "Accent",
 		BackgroundTransparency = 0,
 		BorderSizePixel = 0,
-		Parent = Data.Parent,
+		Parent = Library.Get(Data, { "Parent", "Ascendant" }, nil),
 	}) :: TextButton
 
-	local TransparencyPhase = Data.Transparency
+	local TransparencyPhase = Library.Get(Data, { "Transparency", "TransparencyPhase" }, "Min")
 
 	if TransparencyPhase == "Min" then
 		ElementBody.BackgroundTransparency = 0.95
@@ -531,7 +580,9 @@ function Library.SetupBody(Data)
 	})
 
 	Library.New("UIStroke", {
-		Transparency = Data.StrokeEnabled and (ElementBody.BackgroundTransparency - 0.025) or 1,
+		Transparency = Library.Get(Data, { "Stroke", "StrokeEnabled" }, false)
+				and (ElementBody.BackgroundTransparency - 0.05)
+			or 1,
 		Role = "Accent",
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 		Parent = ElementBody,
@@ -576,7 +627,7 @@ function Library.SetupBody(Data)
 		Size = UDim2.new(0.6, 0, 0.6, 0),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		BackgroundTransparency = 1,
-		Image = Data.Icon,
+		Icon = Library.Get(Data, { "Icon", "Image", "ImageDisplay", "IconDisplay" }, ""),
 		Role = "Icon",
 		ImageTransparency = 0.2,
 		Parent = Icon,
@@ -596,7 +647,7 @@ function Library.SetupBody(Data)
 		Name = "Title",
 		AutomaticSize = Enum.AutomaticSize.XY,
 		BackgroundTransparency = 1,
-		Text = Data.Title,
+		Text = Library.Get(Data, { "Title" }, "Title"),
 		Role = "Text",
 		TextSize = 18,
 		TextTransparency = 0.2,
@@ -611,7 +662,7 @@ function Library.SetupBody(Data)
 		LayoutOrder = 1,
 		AutomaticSize = Enum.AutomaticSize.XY,
 		BackgroundTransparency = 1,
-		Text = Data.Description,
+		Text = Library.Get(Data, { "Desc", "Description", "About" }, ""),
 		Role = "Text",
 		TextSize = 14,
 		TextTransparency = 0.4,
@@ -912,7 +963,7 @@ function Library.SetupAnimation(Animation, Window, Data)
 			BackgroundTransparency = 0,
 			ClipsDescendants = false,
 			Transparency = 0,
-			Image = "rbxassetid://88713227769730",
+			Icon = "rbxassetid://88713227769730",
 			ImageColor3 = Color3.fromRGB(255, 255, 255),
 			Ignore = true,
 			ImageTransparency = 0,
@@ -936,7 +987,7 @@ function Library.SetupAnimation(Animation, Window, Data)
 			BackgroundTransparency = 1,
 			ClipsDescendants = false,
 			Transparency = 1,
-			Image = "rbxassetid://75039717310710",
+			Icon = "rbxassetid://75039717310710",
 			ImageColor3 = Color3.fromRGB(255, 255, 255),
 			ImageTransparency = 0,
 			ScaleType = Enum.ScaleType.Tile,
@@ -964,7 +1015,7 @@ function Library.SetupAnimation(Animation, Window, Data)
 			BackgroundTransparency = 1,
 			ClipsDescendants = false,
 			Transparency = 1,
-			Image = "rbxassetid://90519913198907",
+			Icon = "rbxassetid://90519913198907",
 			ImageColor3 = Color3.fromRGB(255, 255, 255),
 			ImageTransparency = 0,
 			Ignore = true,
@@ -1424,7 +1475,7 @@ function Library:Window(Data)
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		Image = Data and (Data.BackgroundImage or Data.Background) or "",
+		Icon = Library.Get(Data, { "BackgroundImage", "Background" }, ""),
 		Role = "Icon",
 		ImageTransparency = 0.9,
 		ScaleType = Enum.ScaleType.Crop,
@@ -1447,7 +1498,7 @@ function Library:Window(Data)
 		Size = UDim2.new(1, 0, 1, 0),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		Image = "rbxassetid://90085857557952",
+		Icon = "rbxassetid://90085857557952",
 		ImageColor3 = Color3.fromRGB(255, 255, 255),
 		ImageTransparency = 1,
 		Parent = IgnoreLayout,
@@ -1464,7 +1515,7 @@ function Library:Window(Data)
 		Size = UDim2.new(1, 0, 1, 0),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		Image = "rbxassetid://136612025197923",
+		Icon = "rbxassetid://136612025197923",
 		ImageColor3 = Color3.fromRGB(255, 255, 255),
 		ImageTransparency = 1,
 		Parent = IgnoreLayout,
@@ -1481,7 +1532,7 @@ function Library:Window(Data)
 		Size = UDim2.new(1, 0, 1, 0),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		Image = "rbxassetid://80706260659632",
+		Icon = "rbxassetid://80706260659632",
 		ImageColor3 = Color3.fromRGB(255, 255, 255),
 		ImageTransparency = 1,
 		Parent = IgnoreLayout,
@@ -1498,7 +1549,7 @@ function Library:Window(Data)
 		Size = UDim2.new(1, 0, 1, 0),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		Image = "rbxassetid://117215442732435",
+		Icon = "rbxassetid://117215442732435",
 		ImageColor3 = Color3.fromRGB(255, 255, 255),
 		ImageTransparency = 1,
 		Parent = IgnoreLayout,
@@ -1675,7 +1726,7 @@ function Library:Window(Data)
 		Name = "Title",
 		AutomaticSize = Enum.AutomaticSize.XY,
 		BackgroundTransparency = 1,
-		Text = Data.Title,
+		Text = Library.Get(Data, { "Title" }, "Title"),
 		Role = "Text",
 		TextSize = 20,
 		TextTransparency = 0.2,
@@ -1690,7 +1741,7 @@ function Library:Window(Data)
 		Name = "Subtitle",
 		AutomaticSize = Enum.AutomaticSize.XY,
 		BackgroundTransparency = 1,
-		Text = Data.SubTitle,
+		Text = Library.Get(Data, { "SubTitle" }, ""),
 		Role = "Text",
 		TextSize = 16,
 		TextTransparency = 0.4,
@@ -2030,7 +2081,7 @@ function Library:Window(Data)
 			Size = UDim2.new(0, 20, 0, 20),
 			BackgroundTransparency = 1,
 			Role = "Icon",
-			Image = Data.Icon,
+			Icon = Library.Get(Data, { "Icon", "Image", "ImageDisplay", "IconDisplay" }, ""),
 			ImageTransparency = 0.2,
 			Parent = Tab,
 		})
@@ -2043,7 +2094,7 @@ function Library:Window(Data)
 			AutomaticSize = Enum.AutomaticSize.Y,
 			Size = UDim2.new(0.8, 0, 0, 0),
 			BackgroundTransparency = 1,
-			Text = Data.Title,
+			Text = Library.Get(Data, { "Title" }, "Title"),
 			Role = "Text",
 			TextSize = 16,
 			TextTransparency = 0.2,
@@ -2054,7 +2105,7 @@ function Library:Window(Data)
 		})
 
 		local Container = Library.New("ScrollingFrame", {
-			Name = Data.Title,
+			Name = Library.Get(Data, { "Title" }, "Title"),
 			Size = UDim2.new(1, 0, 1, 0),
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
@@ -2105,7 +2156,7 @@ function Library:Window(Data)
 				Name = "Title",
 				AutomaticSize = Enum.AutomaticSize.XY,
 				BackgroundTransparency = 1,
-				Text = Data and (Data.Title or Data.Name) or "Section",
+				Text = Data and (Library.Get(Data, { "Title" }, "Title") or Data.Name) or "Section",
 				Role = "Text",
 				TextSize = 20,
 				TextTransparency = 0.2,
@@ -2146,7 +2197,7 @@ function Library:Window(Data)
 				Size = UDim2.new(0, 35, 0, 35),
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundTransparency = 1,
-				Image = Data and Data.Icon,
+				Icon = Library.Get(Data, { "Icon", "Image", "ImageDisplay", "IconDisplay" }, ""),
 				Role = "Icon",
 				ImageTransparency = 0.2,
 				Visible = Data.Section.ShowIcon,
@@ -2196,20 +2247,15 @@ function Library:Window(Data)
 		function Elements:Toggle(Data)
 			Data = Data or {}
 			local Methods = {}
-			local Body = Library.SetupBody({
-				Title = Data and (Data.Title or Data.Name) or "Toggle",
-				Description = Data and (Data.Desc or Data.Description) or "Description",
-				Icon = Data and (Data.Icon or Data.Image) or "",
-				StrokeEnabled = Data and Data.StrokeEnabled or false,
-				Transparency = Data and (Data.Transparency or Data.TransparencyPhase) or "Min",
-				Parent = Container,
-			})
+			local Body = Library.SetupBody(Data)
 
 			local Interaction = Body.Interaction
+			local ElementBody = Body.ElementBody
 			local Header = Body.Header
 
 			Header.Size = UDim2.fromScale(0.8, 0)
 			Interaction.Size = UDim2.fromScale(0.2, 0)
+			ElementBody.Parent = Container
 
 			local Toggle = Library.New("TextButton", {
 				Name = "Toggle",
@@ -2246,7 +2292,7 @@ function Library:Window(Data)
 			local AnimateOff = Signal.New()
 
 			local Value = Library.Get(Data, { "Value", "Toggled" }, false)
-			local CallbackOnLoad = Data and Data.CallbackOnLoad or false
+			local CallbackOnLoad = Library.Get(Data, { "CallbackOnLoad", "CallbackOnCreation" }, false)
 			local Callback = Signal:Callback(Data and Data.Callback)
 
 			AnimateOn:Connect(function()
@@ -2334,18 +2380,13 @@ function Library:Window(Data)
 		function Elements:Slider(Data)
 			Data = Data or {}
 			local Methods = {}
-			local Body = Library.SetupBody({
-				Title = Data and (Data.Title or Data.Name) or "Toggle",
-				Description = Data and (Data.Desc or Data.Description) or "Description",
-				Icon = Data and (Data.Icon or Data.Image) or "",
-				StrokeEnabled = Data and Data.StrokeEnabled or false,
-				Transparency = Data and (Data.Transparency or Data.TransparencyPhase) or "Min",
-				Parent = Container,
-			})
+			local Body = Library.SetupBody(Data)
 
 			local Interaction = Body.Interaction
+			local ElementBody = Body.ElementBody
 			local Header = Body.Header
 
+			ElementBody.Parent = Container
 			Header.Size = UDim2.fromScale(0.5, 0)
 			Interaction.Size = UDim2.fromScale(0.5, 0)
 
@@ -2586,19 +2627,13 @@ function Library:Window(Data)
 		function Elements:Button(Data)
 			Data = Data or {}
 			local Methods = {}
-			local Body = Library.SetupBody({
-				Title = Data and (Data.Title or Data.Name) or "Toggle",
-				Description = Data and (Data.Desc or Data.Description) or "Description",
-				Icon = Data and (Data.Icon or Data.Image) or "",
-				StrokeEnabled = Library.Get(Data, { "StrokeEnabled", "Stroke" }, false),
-				Transparency = Data and (Data.Transparency or Data.TransparencyPhase) or "Min",
-				Parent = Container,
-			})
+			local Body = Library.SetupBody(Data)
 
 			local Interaction = Body.Interaction
 			local ElementBody = Body.ElementBody
 			local Header = Body.Header
 
+			ElementBody.Parent = Container
 			Header.Size = UDim2.fromScale(0.85, 0)
 			Interaction.Size = UDim2.fromScale(0.15, 0)
 
@@ -2648,7 +2683,7 @@ function Library:Window(Data)
 					BorderSizePixel = 0,
 					BorderMode = Enum.BorderMode.Outline,
 					ClipsDescendants = false,
-					Image = Data and (Data.ButtonIcon or Data.HeadingIcon) or "rbxassetid://72922480325213",
+					Icon = Data and (Data.ButtonIcon or Data.HeadingIcon) or "rbxassetid://72922480325213",
 					Role = "Icon",
 					ImageTransparency = 0.2,
 					ScaleType = Enum.ScaleType.Stretch,
@@ -2704,19 +2739,13 @@ function Library:Window(Data)
 		function Elements:Dropdown(Data)
 			Data = Data or {}
 			local Methods = {}
-			local Body = Library.SetupBody({
-				Title = Data and (Data.Title or Data.Name) or "Toggle",
-				Description = Data and (Data.Desc or Data.Description) or "Description",
-				Icon = Data and (Data.Icon or Data.Image) or "",
-				StrokeEnabled = Library.Get(Data, { "StrokeEnabled", "Stroke" }, false),
-				Transparency = Data and (Data.Transparency or Data.TransparencyPhase) or "Min",
-				Parent = Container,
-			})
+			local Body = Library.SetupBody(Data)
 
 			local Interaction = Body.Interaction
 			local ElementBody = Body.ElementBody
 			local Header = Body.Header
 
+			ElementBody.Parent = Container
 			Header.Size = UDim2.fromScale(0.6, 0)
 			Interaction.Size = UDim2.fromScale(0.4, 0)
 
@@ -2775,7 +2804,7 @@ function Library:Window(Data)
 					LayoutOrder = 1,
 					Role = "Icon",
 					BackgroundTransparency = 1,
-					Image = type(Data.DropdownIcon) == "string" and Data.DropdownIcon or "rbxassetid://10709797508",
+					Icon = type(Data.DropdownIcon) == "string" and Data.DropdownIcon or "rbxassetid://10709797508",
 					ImageTransparency = 0.2,
 					Parent = DropdownPlate,
 				})
@@ -3165,14 +3194,7 @@ function Library:Window(Data)
 		function Elements:Keybind(Data)
 			Data = Data or {}
 			local Methods = {}
-			local Body = Library.SetupBody({
-				Title = Data and (Data.Title or Data.Name) or "Toggle",
-				Description = Data and (Data.Desc or Data.Description) or "Description",
-				Icon = Data and (Data.Icon or Data.Image) or "",
-				StrokeEnabled = Library.Get(Data, { "StrokeEnabled", "Stroke" }, false),
-				Transparency = Data and (Data.Transparency or Data.TransparencyPhase) or "Min",
-				Parent = Container,
-			})
+			local Body = Library.SetupBody(Data)
 
 			local Interaction = Body.Interaction
 			local ElementBody = Body.ElementBody
@@ -3180,6 +3202,7 @@ function Library:Window(Data)
 
 			Header.Size = UDim2.fromScale(0.6, 0)
 			Interaction.Size = UDim2.fromScale(0.4, 0)
+			ElementBody.Parent = Container
 
 			local Input = Library.New("Frame", {
 				Name = "Input",
@@ -3341,8 +3364,8 @@ function Library:Window(Data)
 				Name = "SectionTitle",
 				AutomaticSize = Enum.AutomaticSize.XY,
 				BackgroundTransparency = 1,
-				Text = Data and (Data.Title or Data.Text or Data.Name) or "Label",
-				TextSize = Data and Data.TextSize or 20,
+				Text = Library.Get(Data, { "Title", "Text", "Name" }, "Label"),
+				TextSize = Library.Get(Data, { "TextSize" }, 20),
 				TextTransparency = 0.2,
 				FontFace = Font.new("rbxassetid://16658221428", Enum.FontWeight.Medium),
 				Parent = Section,
@@ -3361,7 +3384,7 @@ function Library:Window(Data)
 				Position = UDim2.new(-0.005, 0, 0, 0),
 				Size = UDim2.fromOffset(24, 24),
 				BackgroundTransparency = 1,
-				Image = Data and (Data.Icon or Data.Image) or "",
+				Icon = Library.Get(Data, { "Icon", "Image", "ImageDisplay", "IconDisplay" }, ""),
 				LayoutOrder = -1,
 				ImageTransparency = 0.2,
 				Parent = Section,
@@ -3390,20 +3413,15 @@ function Library:Window(Data)
 
 		function Elements:BodyLabel(Data)
 			local Methods = {}
-			local Body = Library.SetupBody({
-				Title = Data and (Data.Title or Data.Name) or "Toggle",
-				Description = "",
-				Icon = Data and (Data.Icon or Data.Image) or "",
-				StrokeEnabled = Library.Get(Data, { "StrokeEnabled", "Stroke" }, false),
-				Transparency = Data and (Data.Transparency or Data.TransparencyPhase) or "Min",
-				Parent = Container,
-			})
+			local Body = Library.SetupBody(Data)
 
 			local Interaction = Body.Interaction
 			local ElementBody = Body.ElementBody
 			local Header = Body.Header
 
 			Header.Size = UDim2.fromScale(0.5, 0)
+
+			ElementBody.Parent = Container
 			Interaction.Size = UDim2.fromScale(0.5, 0)
 
 			local Value = Library.New("TextLabel", {
@@ -3419,7 +3437,7 @@ function Library:Window(Data)
 				BorderSizePixel = 0,
 				ClipsDescendants = false,
 				BackgroundTransparency = 1,
-				Text = Library.Get(Data, { "Desc", "Description", "Value", "Text", "Name" }, "Value"),
+				Text = Library.Get(Data, { "Value", "Text", "Name" }, "Value"),
 				Role = "Text",
 				TextSize = 16,
 				TextScaled = false,
@@ -3440,6 +3458,12 @@ function Library:Window(Data)
 
 				Value.Text = Text
 			end
+
+			local Callback = Signal:Callback(Data and Data.Callback or function() end)
+
+			ElementBody.MouseButton1Click:Connect(function()
+				Callback:Fire()
+			end)
 
 			return Methods, Body
 		end
@@ -3488,8 +3512,8 @@ function Library:Window(Data)
 			})
 
 			Library.New("UIListLayout", {
-				FillDirection = Enum.FillDirection.Horizontal,
-				HorizontalAlignment = Enum.HorizontalAlignment.Left,
+				FillDirection = Enum.FillDirection.Vertical,
+				HorizontalAlignment = Enum.HorizontalAlignment.Center,
 				VerticalAlignment = Enum.VerticalAlignment.Center,
 				SortOrder = Enum.SortOrder.LayoutOrder,
 				Padding = UDim.new(0, 8),
@@ -3500,11 +3524,11 @@ function Library:Window(Data)
 				PaddingTop = UDim.new(0, 8),
 				PaddingBottom = UDim.new(0, 8),
 				PaddingLeft = UDim.new(0, 8),
-				PaddingRight = UDim.new(0, 8),
+				PaddingRight = UDim.new(0.15, 0),
 				Parent = Profile,
 			})
 
-			local Icon = Library.New("ImageLabel", {
+			local ProfileIcon = Library.New("ImageLabel", {
 				Name = "Icon",
 				Visible = true,
 				ZIndex = 1,
@@ -3515,9 +3539,14 @@ function Library:Window(Data)
 				BackgroundColor3 = Color3.fromRGB(163, 162, 165),
 				BackgroundTransparency = 0.95,
 				Transparency = 0.95,
-				Image = "rbxthumb://type=AvatarHeadShot&id=2343555344&w=420&h=420",
+				Icon = Players:GetUserThumbnailAsync(
+					LocalPlayer.UserId,
+					Enum.ThumbnailType.HeadShot,
+					Enum.ThumbnailSize.Size420x420
+				),
 				ImageColor3 = Color3.fromRGB(255, 255, 255),
 				ImageTransparency = 0,
+				Ignore = true,
 				Rotation = 0,
 				Parent = Profile,
 			})
@@ -3529,13 +3558,13 @@ function Library:Window(Data)
 				Color = Color3.fromRGB(255, 255, 255),
 				Thickness = 1,
 				Enabled = true,
-				Parent = Icon,
+				Parent = ProfileIcon,
 			})
 
 			Library.New("UICorner", {
 				Name = "UICorner",
 				CornerRadius = UDim.new(1.000, 0),
-				Parent = Icon,
+				Parent = ProfileIcon,
 			})
 
 			local Displays = Library.New("Frame", {
@@ -3543,9 +3572,9 @@ function Library:Window(Data)
 				Visible = true,
 				LayoutOrder = 1,
 				Position = UDim2.new(0.156, 0, 0.115, 0),
-				Size = UDim2.new(0.500, 0, 0.769, 0),
+				Size = UDim2.new(0, 0, 0, 0),
 				AnchorPoint = Vector2.new(0.000, 0.000),
-				AutomaticSize = Enum.AutomaticSize.Y,
+				AutomaticSize = Enum.AutomaticSize.XY,
 				BackgroundColor3 = Color3.fromRGB(163, 162, 165),
 				BackgroundTransparency = 1,
 				ClipsDescendants = false,
@@ -3556,7 +3585,7 @@ function Library:Window(Data)
 			Library.New("UIListLayout", {
 				Name = "UIListLayout",
 				FillDirection = Enum.FillDirection.Vertical,
-				HorizontalAlignment = Enum.HorizontalAlignment.Left,
+				HorizontalAlignment = Enum.HorizontalAlignment.Center,
 				VerticalAlignment = Enum.VerticalAlignment.Top,
 				SortOrder = Enum.SortOrder.LayoutOrder,
 				Padding = UDim.new(0.000, 0),
@@ -3595,7 +3624,7 @@ function Library:Window(Data)
 				AutomaticSize = Enum.AutomaticSize.XY,
 				BackgroundColor3 = Color3.fromRGB(163, 162, 165),
 				BackgroundTransparency = 1,
-				Text = LocalPlayer.Name or "username",
+				Text = "@" .. tostring(LocalPlayer.Name) .. "",
 				TextColor3 = Color3.fromRGB(255, 255, 255),
 				TextSize = 14,
 				TextTransparency = 0.5,
@@ -3634,11 +3663,41 @@ function Library:Window(Data)
 				Name = "UIListLayout",
 				FillDirection = Enum.FillDirection.Horizontal,
 				HorizontalAlignment = Enum.HorizontalAlignment.Right,
-				VerticalAlignment = Enum.VerticalAlignment.Center,
+				VerticalAlignment = Enum.VerticalAlignment.Bottom,
 				SortOrder = Enum.SortOrder.LayoutOrder,
 				Padding = UDim.new(0, 6),
 				Parent = IgnoreLayout,
 			})
+
+			SetProfileAnonimity:Connect(function(Object, Value)
+				if Object == "Username" then
+					if Value then
+						User.Text = "@Anonymous"
+					else
+						User.Text = "@" .. tostring(LocalPlayer.Name) .. ""
+					end
+				elseif Object == "Display" then
+					if Value then
+						Display.Text = "Anonymous"
+					else
+						Display.Text = tostring(LocalPlayer.DisplayName)
+					end
+				elseif Object == "Screenshot" then
+					if Value then
+						ProfileIcon.Image = Players:GetUserThumbnailAsync(
+							1,
+							Enum.ThumbnailType.HeadShot,
+							Enum.ThumbnailSize.Size420x420
+						)
+					else
+						ProfileIcon.Image = Players:GetUserThumbnailAsync(
+							LocalPlayer.UserId,
+							Enum.ThumbnailType.HeadShot,
+							Enum.ThumbnailSize.Size420x420
+						)
+					end
+				end
+			end)
 
 			function Methods:Button(Data)
 				local Button = Library.New("TextButton", {
@@ -3661,7 +3720,7 @@ function Library:Window(Data)
 					Position = UDim2.new(0.5, 0, 0.5, 0),
 					Size = UDim2.new(0, 16, 0, 16),
 					BackgroundTransparency = 1,
-					Image = Data and Data.Icon or "",
+					Icon = Data and Data.Icon or "",
 					ImageTransparency = 0.4,
 					Parent = Button,
 				})
@@ -3702,19 +3761,12 @@ function Library:Window(Data)
 				return Button
 			end
 
-			return Methods
+			return Methods, Profile
 		end
 
 		function Elements:Paragraph(Data)
 			local Methods = {}
-			local Body = Library.SetupBody({
-				Title = Data and (Data.Title or Data.Name) or "Toggle",
-				Description = Data and (Data.Desc or Data.Description) or "Description",
-				Icon = Data and (Data.Icon or Data.Image) or "",
-				StrokeEnabled = Library.Get(Data, { "StrokeEnabled", "Stroke" }, false),
-				Transparency = Data and (Data.Transparency or Data.TransparencyPhase) or "Min",
-				Parent = Container,
-			})
+			local Body = Library.SetupBody(Data)
 
 			local Interaction = Body.Interaction
 			local ElementBody = Body.ElementBody
@@ -3725,6 +3777,8 @@ function Library:Window(Data)
 
 			Body.Title.Size = UDim2.fromScale(0.95, 0)
 			Body.Description.Size = UDim2.fromScale(0.95, 0)
+
+			ElementBody.Parent = Container
 
 			function Methods:SetBackgroundTransparency(Transparency)
 				Signal:Assert(
@@ -3763,18 +3817,13 @@ function Library:Window(Data)
 		function Elements:Section(Data)
 			Data = Data or {}
 			local Methods = {}
-			local Body = Library.SetupBody({
-				Title = Data and (Data.Title or Data.Name) or "Toggle",
-				Description = Data and (Data.Desc or Data.Description) or "Description",
-				Icon = Data and (Data.Icon or Data.Image) or "",
-				StrokeEnabled = Library.Get(Data, { "StrokeEnabled", "Stroke" }, false),
-				Transparency = Data and (Data.Transparency or Data.TransparencyPhase) or "Min",
-				Parent = Container,
-			})
+			local Body = Library.SetupBody(Data)
+			local Blank = Library.Get(Data, { "Blank" }, false)
 
 			local Interaction = Body.Interaction :: Frame
 			local Header = Body.Header :: Frame
 			local ElementBody = Body.ElementBody :: TextButton
+			ElementBody.Parent = Container
 
 			local _Elements = Library.New("Frame", {
 				Name = "Elements",
@@ -3797,6 +3846,11 @@ function Library:Window(Data)
 
 			Header.Size = UDim2.fromScale(0.9, 0)
 			Interaction.Size = UDim2.fromScale(0.08, 0)
+
+			if Blank then
+				Header.Visible = false
+				Interaction.Visible = false
+			end
 
 			local Class = Data and (Data.Class or Data.Type) or "Normal"
 			local Chevron = nil
@@ -3841,8 +3895,6 @@ function Library:Window(Data)
 
 				local Value = Library.Get(Data, { "Value", "Toggled" }, false)
 				local Callback = Signal:Callback(Data and Data.Callback)
-
-				local CornerSize = Library.Get(Data, { "ElementCornerSize" }, 5) :: Number
 
 				AnimateOn:Connect(function()
 					Signal:Animate(
@@ -3955,7 +4007,7 @@ function Library:Window(Data)
 					Size = UDim2.new(0, 22, 0, 22),
 					AnchorPoint = Vector2.new(1, 0.5),
 					BackgroundTransparency = 1,
-					Image = "rbxassetid://109320394183701",
+					Icon = "rbxassetid://109320394183701",
 					ImageTransparency = 0.4,
 					Rotation = 180,
 					Parent = Interaction,
@@ -4125,6 +4177,7 @@ function Library:Window(Data)
 			end
 
 			local function SetChildrenCorners()
+				local _CornerSize = Library.Get(Data, { "CornerSize", "ElementCornerSize" }, 5)
 				local Children, Bodies = GetElements()
 
 				if Children > 1 then
@@ -4135,26 +4188,29 @@ function Library:Window(Data)
 								if Index == 1 then
 									Corner.TopLeftRadius = UDim.new(0, 15)
 									Corner.TopRightRadius = UDim.new(0, 15)
-									Corner.BottomLeftRadius = UDim.new(0, CornerSize)
-									Corner.BottomRightRadius = UDim.new(0, CornerSize)
+									Corner.BottomLeftRadius = UDim.new(0, _CornerSize)
+									Corner.BottomRightRadius = UDim.new(0, _CornerSize)
 								elseif Index == 2 then
 									Corner.BottomLeftRadius = UDim.new(0, 15)
 									Corner.BottomRightRadius = UDim.new(0, 15)
-									Corner.TopLeftRadius = UDim.new(0, CornerSize)
-									Corner.TopRightRadius = UDim.new(0, CornerSize)
+									Corner.TopLeftRadius = UDim.new(0, _CornerSize)
+									Corner.TopRightRadius = UDim.new(0, _CornerSize)
 								end
 							elseif Children > 2 then
 								if Index == 1 then
 									Corner.TopLeftRadius = UDim.new(0, 15)
 									Corner.TopRightRadius = UDim.new(0, 15)
-									Corner.BottomLeftRadius = UDim.new(0, CornerSize)
-									Corner.BottomRightRadius = UDim.new(0, CornerSize)
+									Corner.BottomLeftRadius = UDim.new(0, _CornerSize)
+									Corner.BottomRightRadius = UDim.new(0, _CornerSize)
 								elseif Index > 1 and Index < Children then
-									Corner.CornerRadius = UDim.new(0, CornerSize)
+									Corner.TopLeftRadius = UDim.new(0, _CornerSize)
+									Corner.TopRightRadius = UDim.new(0, _CornerSize)
+									Corner.BottomLeftRadius = UDim.new(0, _CornerSize)
+									Corner.BottomRightRadius = UDim.new(0, _CornerSize)
 								elseif Index == Children then
 									Corner.BottomLeftRadius = UDim.new(0, 15)
 									Corner.BottomRightRadius = UDim.new(0, 15)
-									Corner.TopLeftRadius = UDim.new(0, CornerSize)
+									Corner.TopLeftRadius = UDim.new(0, _CornerSize)
 									Corner.TopRightRadius = UDim.new(0, CornerSize)
 								end
 							end
@@ -4188,15 +4244,7 @@ function Library:Window(Data)
 
 			function Methods:Toggle(Args)
 				Args = Args or {}
-				local Element, _Body = Elements:Toggle({
-					Title = Args.Title or Args.Name or "Toggle",
-					Description = Args.Desc or Args.Description or "Description",
-					StrokeEnabled = Library.Get(Args, { "StrokeEnabled", "Stroke" }, false),
-					Icon = Args.Icon or Args.Image or "",
-					Transparency = Args.Transparency or Args.TransparencyPhase or "Min",
-					Value = Library.Get(Args, { "Value", "Default" }, false),
-					Callback = Args.Callback,
-				})
+				local Element, _Body = Elements:Toggle(Args)
 
 				_Body.ElementBody.Parent = _Elements
 				return Element
@@ -4204,17 +4252,7 @@ function Library:Window(Data)
 
 			function Methods:Button(Args)
 				Args = Args or {}
-				local Element, _Body = Elements:Button({
-					Title = Args.Title or Args.Name or "Button",
-					Description = Args.Desc or Args.Description or "Description",
-					Icon = Args.Icon or Args.Image or "",
-					ButtonClass = Args.ButtonClass or Args.HeadingButton or "Icon",
-					ButtonIcon = Args.ButtonIcon or Args.HeadingIcon,
-					ButtonText = Args.ButtonText or Args.HeadingText,
-					StrokeEnabled = Library.Get(Args, { "StrokeEnabled", "Stroke" }, false),
-					Transparency = Args.Transparency or Args.TransparencyPhase or "Min",
-					Callback = Args.Callback,
-				})
+				local Element, _Body = Elements:Button(Args)
 
 				_Body.ElementBody.Parent = _Elements
 				return Element
@@ -4222,19 +4260,7 @@ function Library:Window(Data)
 
 			function Methods:Slider(Args)
 				Args = Args or {}
-				local Element, _Body = Elements:Slider({
-					Title = Args.Title or Args.Name or "Toggle",
-					Description = Args.Desc or Args.Description or "Description",
-					Icon = Args.Icon or Args.Image or "",
-					Max = Library.Get(Args, { "Max", "MaximumValue" }, 0),
-					Min = Library.Get(Args, { "Min", "MinimumValue" }, 0),
-					Step = Library.Get(Args, { "Step", "Threshold" }, 0),
-					Value = Library.Get(Args, { "Value", "Default", "Min", "MinimumValue" }, 0),
-					StrokeEnabled = Library.Get(Args, { "StrokeEnabled", "Stroke" }, false),
-					SmoothSlide = Library.Get(Args, { "SmoothSlide", "SmoothSlider" }, false),
-					Transparency = Args.Transparency or Args.TransparencyPhase or "Min",
-					Callback = Args.Callback,
-				})
+				local Element, _Body = Elements:Slider(Args)
 
 				_Body.ElementBody.Parent = _Elements
 				return Element
@@ -4242,18 +4268,7 @@ function Library:Window(Data)
 
 			function Methods:Dropdown(Args)
 				Args = Args or {}
-				local Element, _Body = Elements:Dropdown({
-					Title = Args.Title or Args.Name or "Toggle",
-					Description = Args.Desc or Args.Description or "Description",
-					Icon = Args.Icon or Args.Image or "",
-					Multi = Library.Get(Args, { "Multi", "Multiple" }, false),
-					Values = Args.Values or Args.Table or {},
-					Value = Library.Get(Args, { "Value", "Default" }, nil),
-					StrokeEnabled = Library.Get(Args, { "StrokeEnabled", "Stroke" }, false),
-					Transparency = Args.Transparency or Args.TransparencyPhase or "Min",
-					DropdownIcon = Args.DropdownIcon or "",
-					Callback = Args.Callback,
-				})
+				local Element, _Body = Elements:Dropdown(Args)
 
 				_Body.ElementBody.Parent = _Elements
 				return Element
@@ -4261,16 +4276,7 @@ function Library:Window(Data)
 
 			function Methods:Keybind(Args)
 				Args = Args or {}
-				local Element, _Body = Elements:Keybind({
-					Title = Args and (Args.Title or Args.Name) or "Toggle",
-					Description = Args and (Args.Desc or Args.Description) or "Description",
-					Icon = Args and (Args.Icon or Args.Image) or "",
-					Value = Library.Get(Args, { "Value", "Default" }, Enum.KeyCode.Asterisk),
-					StrokeEnabled = Library.Get(Args, { "StrokeEnabled", "Stroke" }, false),
-					Transparency = Args and (Args.Transparency or Args.TransparencyPhase) or "Min",
-					KeyPressCallback = Args and Args.OnKeyPressCallback or function() end,
-					Callback = Args and Args.Callback or function() end,
-				})
+				local Element, _Body = Elements:Keybind(Args)
 
 				_Body.ElementBody.Parent = _Elements
 				return Element
@@ -4278,11 +4284,7 @@ function Library:Window(Data)
 
 			function Methods:Label(Args)
 				Args = Args or {}
-				local Element, _Body = Elements:Label({
-					Title = Args and (Args.Title or Args.Name) or "Label",
-					TextSize = Library.Get(Args, { "TextSize" }, 20),
-					Icon = Args and (Args.Icon or Args.Image) or "",
-				})
+				local Element, _Body = Elements:Label(Args)
 
 				Library.New("UIPadding", {
 					Parent = _Body,
@@ -4296,13 +4298,7 @@ function Library:Window(Data)
 
 			function Methods:BodyLabel(Args)
 				Args = Args or {}
-				local Element, _Body = Elements:BodyLabel({
-					Title = Args.Title or Args.Name or "Body Label",
-					Icon = Args.Icon or Args.Image or "",
-					Value = Library.Get(Args, { "Value", "Desc", "Description", "Text", "Name" }, "Value"),
-					StrokeEnabled = Library.Get(Args, { "StrokeEnabled", "Stroke" }, false),
-					Transparency = Args.Transparency or Args.TransparencyPhase or "Min",
-				})
+				local Element, _Body = Elements:BodyLabel(Args)
 
 				_Body.ElementBody.Parent = _Elements
 				return Element
@@ -4310,13 +4306,7 @@ function Library:Window(Data)
 
 			function Methods:Paragraph(Args)
 				Args = Args or {}
-				local Element, _Body = Elements:Paragraph({
-					Title = Args and (Args.Title or Args.Name) or "Toggle",
-					Description = Args and (Args.Desc or Args.Description) or "Description",
-					Icon = Args and (Args.Icon or Args.Image) or "",
-					StrokeEnabled = Library.Get(Args, { "StrokeEnabled", "Stroke" }, false),
-					Transparency = Args and (Args.Transparency or Args.TransparencyPhase) or "Min",
-				})
+				local Element, _Body = Elements:Paragraph(Args)
 
 				_Body.ElementBody.Parent = _Elements
 				return Element
@@ -4324,10 +4314,7 @@ function Library:Window(Data)
 
 			function Methods:Divider(Args)
 				Args = Args or {}
-				local Element, _Body = Elements:Divider({
-					Size = Args.Size or 0.9,
-					Transparency = Args.Transparency or 0.9,
-				})
+				local Element, _Body = Elements:Divider(Args)
 
 				_Body.Parent = _Elements
 				return Element
@@ -4409,7 +4396,7 @@ function Library:Window(Data)
 			Name = "TabTitle",
 			LayoutOrder = 2,
 			AutomaticSize = Enum.AutomaticSize.Y,
-			Text = Data and (Data.Title or Data.Name) or "Section",
+			Text = Data and (Library.Get(Data, { "Title" }, "Title") or Data.Name) or "Section",
 			Role = "Text",
 			Size = UDim2.new(0.75, 0, 0, 0),
 			BackgroundTransparency = 1,
@@ -4428,7 +4415,7 @@ function Library:Window(Data)
 			Size = UDim2.new(0, 20, 0, 20),
 			BackgroundTransparency = 1,
 			Role = "Icon",
-			Image = Data and (Data.Icon or Data.Image) or "",
+			Icon = Data and (Data.Icon or Data.Image) or "",
 			ImageTransparency = 0.4,
 			Parent = SectionToggle,
 		})
@@ -4461,7 +4448,7 @@ function Library:Window(Data)
 			Size = UDim2.new(0, 22, 0, 22),
 			AnchorPoint = Vector2.new(1, 0.5),
 			BackgroundTransparency = 1,
-			Image = "rbxassetid://109320394183701",
+			Icon = "rbxassetid://109320394183701",
 			Role = "Icon",
 			ImageTransparency = 0.4,
 			Rotation = 180,
@@ -4595,12 +4582,7 @@ function Library:Window(Data)
 		end)
 
 		function TabController:Tab(Data)
-			local Elements, Body = Controller:Tab({
-				Title = Data and (Data.Title or Data.Name) or "Tab",
-				Description = Data and (Data.Description or Data.Desc) or "Description",
-				Icon = Data and (Data.Icon or Data.Image) or "",
-				Section = Data and Data.Section,
-			})
+			local Elements, Body = Controller:Tab(Data)
 
 			if Body then
 				Body.Parent = Section
@@ -4655,10 +4637,10 @@ function Library:Window(Data)
 		Library.New("Frame", {
 			Name = "Line",
 			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.new(Data and Data.Size or 0.9, 0, 0, 1),
+			Size = UDim2.new(Library.Get(Data, { "Size" }, 0.9), 0, 0, 1),
 			AnchorPoint = Vector2.new(0.5, 0),
 			Role = "Accent",
-			BackgroundTransparency = Data and Data.Transparency or 0.9,
+			BackgroundTransparency = Library.Get(Data, { "Transparency" }, 0.9),
 			Parent = Divider,
 			BorderSizePixel = 0,
 		})
@@ -4692,9 +4674,25 @@ function Library:Window(Data)
 
 		Signal:Animate(
 			BackgroundImage,
-			{ Time = 0.25, Style = Enum.EasingStyle.Cubic, Direction = Enum.EasingDirection.InOut },
+			{ Time = 0.5, Style = Enum.EasingStyle.Cubic, Direction = Enum.EasingDirection.InOut },
 			{ ImageTransparency = Transparency }
 		)
+	end
+
+	function Controller:SetWindowTransparency(Transparency)
+		Signal:Assert(
+			Transparency ~= nil and type(Transparency) == "number",
+			"Argument is nil and/or is not a number",
+			"SetWindowTransparency"
+		)
+
+		Signal:Animate(
+			Window,
+			{ Time = 0.5, Style = Enum.EasingStyle.Sine, Direction = Enum.EasingDirection.Out },
+			{ BackgroundTransparency = Transparency }
+		)
+
+		Controller.WindowTransparency = Transparency
 	end
 
 	function Controller:NewTopbarButton(Data)
@@ -4715,7 +4713,7 @@ function Library:Window(Data)
 			Size = UDim2.new(0, 16, 0, 16),
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 1,
-			Image = Data.Icon,
+			Icon = Data.Icon,
 			Role = "Icon",
 			ImageTransparency = 0.4,
 			Parent = Button,
@@ -4779,7 +4777,7 @@ function Library:Window(Data)
 			Size = UDim2.new(0, 20, 0, 20),
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 1,
-			Image = Data.Icon,
+			Icon = Library.Get(Data, { "Icon", "Image", "ImageDisplay", "IconDisplay" }, ""),
 			Role = "Icon",
 			ImageTransparency = 0.4,
 			Parent = InteractionButton,
@@ -4838,22 +4836,6 @@ function Library:Window(Data)
 		_UIScale.Scale = Scale
 	end
 
-	function Controller:SetWindowTransparency(Transparency)
-		Signal:Assert(
-			Transparency ~= nil and type(Transparency) == "number",
-			"Argument is nil and/or is not a number",
-			"SetWindowTransparency"
-		)
-
-		Signal:Animate(
-			Window,
-			{ Time = 0.25, Style = Enum.EasingStyle.Sine, Direction = Enum.EasingDirection.Out },
-			{ BackgroundTransparency = Transparency }
-		)
-
-		Controller.WindowTransparency = Transparency
-	end
-
 	function Controller:SetMinimizeKeybind(Keybind)
 		Signal:Assert(
 			Keybind and typeof(Keybind) == "EnumItem",
@@ -4902,8 +4884,6 @@ function Library:Window(Data)
 	end
 
 	function Controller:UnloadAnimation()
-		Signal:Assert(Controller.LoadedAnimation, "No loaded animation", ":UnloadAnimation")
-
 		if Controller.LoadedAnimation then
 			Controller.LoadedAnimation:Unload()
 			Controller.LoadedAnimation = nil
@@ -4937,9 +4917,9 @@ function Library:Window(Data)
 	if Data.Profile then
 		local Profile = Library.New("Frame", {
 			Name = "Profile",
-			LayoutOrder = Data.Profile.Order or 1,
+			LayoutOrder = Library.Get(Data.Profile, { "Order", "LayoutOrder" }, 1),
 			Size = UDim2.new(1, 0, 0.15, 0),
-			BackgroundTransparency = Data.Profile.Transparent and 1 or 0.95,
+			BackgroundTransparency = Library.Get(Data.Profile, { "Transparent" }, false) and 1 or 0.95,
 			Role = "Accent",
 			BorderSizePixel = 0,
 			Parent = Sidebar,
@@ -4965,7 +4945,7 @@ function Library:Window(Data)
 			Parent = Profile,
 		}) :: UIPadding
 
-		if not Data.Profile.Transparent then
+		if not Library.Get(Data.Profile, { "Transparent" }, false) then
 			Padding.PaddingLeft = UDim.new(0, 8)
 		end
 
@@ -4977,7 +4957,7 @@ function Library:Window(Data)
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 0.95,
 			BorderSizePixel = 0,
-			Image = Data.Profile.AnonymousScreenshot
+			Icon = Library.Get(Data.Profile, { "AnonymousScreenshot" }, false)
 					and Players:GetUserThumbnailAsync(1, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
 				or Players:GetUserThumbnailAsync(
 					LocalPlayer.UserId,
@@ -5015,7 +4995,8 @@ function Library:Window(Data)
 			Name = "Title",
 			AutomaticSize = Enum.AutomaticSize.XY,
 			BackgroundTransparency = 1,
-			Text = Data.Profile.DisplayAnonym and "Anonymous" or tostring(LocalPlayer.DisplayName),
+			Text = Library.Get(Data.Profile, { "DisplayAnonym" }, false) and "Anonymous"
+				or tostring(LocalPlayer.DisplayName),
 			Role = "Text",
 			TextSize = 16,
 			TextTransparency = 0.2,
@@ -5029,7 +5010,8 @@ function Library:Window(Data)
 			Name = "Subtitle",
 			AutomaticSize = Enum.AutomaticSize.XY,
 			BackgroundTransparency = 1,
-			Text = Data.Profile.UserAnonym and "@Anonymous" or "@" .. tostring(LocalPlayer.Name),
+			Text = Library.Get(Data.Profile, { "UserAnonym" }, false) and "@Anonymous"
+				or "@" .. tostring(LocalPlayer.Name),
 			Role = "Text",
 			TextSize = 14,
 			TextTransparency = 0.4,
@@ -5241,7 +5223,7 @@ function Library:Notify(Data)
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
 		ClipsDescendants = false,
-		Text = Data and Data.Title or "Title",
+		Text = Library.Get(Data, { "Title" }, "Title"),
 		Role = "Text",
 		TextSize = 20,
 		TextScaled = false,
@@ -5264,7 +5246,7 @@ function Library:Notify(Data)
 		Parent = Header,
 	})
 
-	if Data.Icon then
+	if Library.Get(Data, { "Icon" }) then
 		local Icon = Library.New("ImageLabel", {
 			Name = "Icon",
 			Visible = true,
@@ -5275,7 +5257,7 @@ function Library:Notify(Data)
 			AnchorPoint = Vector2.new(0, 0),
 			AutomaticSize = Enum.AutomaticSize.None,
 			BackgroundTransparency = 1,
-			Image = Data.Icon,
+			Icon = Library.Get(Data, { "Icon" }),
 			Role = "Icon",
 			ImageTransparency = 0.20000000298023224,
 			Parent = Header,
@@ -5308,7 +5290,7 @@ function Library:Notify(Data)
 		AnchorPoint = Vector2.new(0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
-		Text = Data and Data.Content or "",
+		Text = Library.Get(Data, { "Content" }, ""),
 		Role = "Text",
 		TextSize = 16,
 		TextTransparency = 0.4000000059604645,
@@ -5349,7 +5331,8 @@ function Library:Notify(Data)
 		Parent = Body,
 	})
 
-	if Data and (Data.Background or Data.BackgroundImage) then
+	local Background = Library.Get(Data, { "Background", "BackgroundImage" })
+	if Background then
 		local IgnoreLayout_1 = Library.New("Folder", {
 			Name = "IgnoreLayout",
 			Parent = Body,
@@ -5363,7 +5346,7 @@ function Library:Notify(Data)
 			Size = UDim2.new(1.000, 30, 1.000, 30),
 			AnchorPoint = Vector2.new(0.500, 0.500),
 			BackgroundTransparency = 1,
-			Image = Data and (Data.Background or Data.BackgroundImage),
+			Icon = Background,
 			ImageTransparency = 0.800000011920929,
 			Parent = IgnoreLayout_1,
 		})
@@ -5375,7 +5358,8 @@ function Library:Notify(Data)
 		})
 	end
 
-	if Data.Buttons and #Data.Buttons > 0 then
+	local ButtonsData = Library.Get(Data, { "Buttons" })
+	if ButtonsData and #ButtonsData > 0 then
 		local ButtonLayout = Library.New("Frame", {
 			Name = "ButtonLayout",
 			Visible = true,
@@ -5424,7 +5408,7 @@ function Library:Notify(Data)
 			Parent = Buttons,
 		})
 
-		for Index, Value in ipairs(Data.Buttons) do
+		for Index, Value in ipairs(ButtonsData) do
 			local NotificationButton = Library.New("TextButton", {
 				Name = "NotificationButton",
 				ZIndex = 1,
@@ -5463,7 +5447,7 @@ function Library:Notify(Data)
 				Size = UDim2.new(0, 0, 0, 0),
 				AnchorPoint = Vector2.new(0, 0),
 				BackgroundTransparency = 1,
-				Text = Value.Title or "Action",
+				Text = Library.Get(Value, { "Title" }, "Action"),
 				AutomaticSize = Enum.AutomaticSize.XY,
 				Role = "Text",
 				TextSize = 15,
@@ -5503,10 +5487,10 @@ function Library:Notify(Data)
 				)
 			end)
 
-			local Callback = Signal:Callback(Value.Callback)
+			local Callback = Signal:Callback(Library.Get(Value, { "Callback" }))
 
 			NotificationButton.MouseButton1Click:Connect(function()
-				if Value.DestroyOnClick then
+				if Library.Get(Value, { "DestroyOnClick" }) then
 					RemoveFromQueue:Fire(Notification)
 					return
 				end
@@ -5517,8 +5501,8 @@ function Library:Notify(Data)
 	end
 
 	--// Logic
-	local Duration = Data and Data.Duration or 3
-	local CloseType = Data and Data.CloseType or "Body Click"
+	local Duration = Library.Get(Data, { "Duration" }, 3)
+	local CloseType = Library.Get(Data, { "Close", "CloseType" }, "Body Click")
 	local NotificationTransparency = Body.BackgroundTransparency
 
 	Body.MouseEnter:Connect(function()
