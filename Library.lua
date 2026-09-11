@@ -4156,7 +4156,7 @@ function Library:Window(Data)
 
 			ElementBody.MouseButton1Click:Connect(function()
 				if Blank then
-					Open:Fire()
+					--// Open:Fire()
 					return
 				end
 								
