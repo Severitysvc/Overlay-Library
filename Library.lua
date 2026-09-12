@@ -51,7 +51,7 @@ end
 
 --// Icons
 local API = not Library.IsStudio
-		and loadstring(game:HttpGetAsync("https://raw.githubusercontent.com/Footagesus/Icons/main/Main-v2.lua"))() --// Creds: https://github.com/Footagesus/Icons
+		and getgenv().iconapi --// Creds: https://github.com/Footagesus/Icons
 	or {
 		SetIconsType = function(Object)
 			return Object
