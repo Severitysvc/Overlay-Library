@@ -1358,6 +1358,7 @@ function Library:Window(Data)
 
 	Controller.OnDestroy = OnDestroy
 	Controller.OnMinimize = Minimize
+	Controller.Destroyed = false
 
 	Controller.MinimizeKeybind = Library.Get(Data, { "MinimizeKeybind" }, Enum.KeyCode.RightShift)
 	Controller.IsMinimized = Library.Get(Data, { "IsMinimized", "Minimized" }, false)
@@ -4155,11 +4156,6 @@ function Library:Window(Data)
 			end)
 
 			ElementBody.MouseButton1Click:Connect(function()
-				if Blank then
-					--// Open:Fire()
-					return
-				end
-								
 				Opened = not Opened
 
 				if Opened then
