@@ -1358,6 +1358,7 @@ function Library:Window(Data)
 
 	Controller.OnDestroy = OnDestroy
 	Controller.OnMinimize = Minimize
+	Controller.OnUnMinimize = UnMinimize
 
 	Controller.MinimizeKeybind = Library.Get(Data, { "MinimizeKeybind" }, Enum.KeyCode.RightShift)
 	Controller.IsMinimized = Library.Get(Data, { "IsMinimized", "Minimized" }, false)
