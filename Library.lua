@@ -3843,7 +3843,7 @@ function Library:Window(Data)
 			return Methods, Body
 		end
 
-		function Elements:Colorpicker(Data)
+		function Elements:ColorPicker(Data)
 			Data = Data or {}
 			local Methods = {}
 			local Body = Library.SetupBody(Data)
@@ -4929,6 +4929,14 @@ function Library:Window(Data)
 			function Methods:Divider(Args)
 				Args = Args or {}
 				local Element, _Body = Elements:Divider(Args)
+
+				_Body.Parent = _Elements
+				return Element
+			end
+
+			function Methods:ColorPicker(Args)
+				Args = Args or {}
+				local Element, _Body = Elements:ColorPicker(Args)
 
 				_Body.Parent = _Elements
 				return Element
