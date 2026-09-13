@@ -4952,7 +4952,7 @@ function Library:Window(Data)
 
 		local ProfileIcon = Library.New("ImageLabel", {
 			Name = "Icon",
-			LayoutOrder = 1,
+			LayoutOrder = -1,
 			Position = UDim2.new(0.195, 0, 0.5, 0),
 			Size = UDim2.new(0, 45, 0, 45),
 			AnchorPoint = Vector2.new(0.5, 0.5),
