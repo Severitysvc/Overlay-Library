@@ -4939,7 +4939,7 @@ function Library:Window(Data)
 				Args = Args or {}
 				local Element, _Body = Elements:ColorPicker(Args)
 
-				_Body.Parent = _Elements
+				_Body.ElementBody.Parent = _Elements
 				return Element
 			end
 
