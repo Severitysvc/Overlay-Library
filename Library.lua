@@ -1358,11 +1358,14 @@ function Library:Window(Data)
 
 	Controller.OnDestroy = OnDestroy
 	Controller.OnMinimize = Minimize
-	Controller.Destroyed = false
 
 	Controller.MinimizeKeybind = Library.Get(Data, { "MinimizeKeybind" }, Enum.KeyCode.RightShift)
 	Controller.IsMinimized = Library.Get(Data, { "IsMinimized", "Minimized" }, false)
 	Controller.Minimizing = false
+
+	Controller.PopupOverlay = nil
+	Controller.StartPopup = Signal.New()
+	Controller.EndPopup = Signal.New()
 
 	local Window = Library.New("Frame", {
 		Name = "Window",
@@ -1378,6 +1381,30 @@ function Library:Window(Data)
 	}) :: Frame
 
 	local IgnoreLayout = Library.New("Folder", { Name = "IgnoreLayout", Parent = Window })
+
+	local PopupOverlay = Library.New("Frame", {
+		Name = "PopupOverlay",
+		Visible = true,
+		ZIndex = 2,
+		LayoutOrder = 0,
+		Position = UDim2.new(0.000, 0, 0.000, 0),
+		Size = UDim2.new(1.000, 0, 1.000, 0),
+		AnchorPoint = Vector2.new(0.000, 0.000),
+		AutomaticSize = Enum.AutomaticSize.None,
+		SizeConstraint = Enum.SizeConstraint.RelativeXY,
+		Rotation = 0,
+		Active = false,
+		Selectable = false,
+		BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+		BackgroundTransparency = 1,
+		BorderColor3 = Color3.fromRGB(0, 0, 0),
+		BorderSizePixel = 0,
+		BorderMode = Enum.BorderMode.Outline,
+		Transparency = 0.30000001192092896,
+		Parent = IgnoreLayout,
+	})
+
+	Controller.PopupOverlay = PopupOverlay
 
 	local DragBar = Library.New("Frame", {
 		Name = "DragBar",
@@ -1458,6 +1485,7 @@ function Library:Window(Data)
 	Body.Window = Window
 
 	Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.High), Parent = Window })
+	Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.High), Parent = PopupOverlay })
 	Controller.WindowSize = Data and (Data.WindowSize or Data.Size) or UDim2.new(0, 700, 0, 500)
 	Controller.WindowTransparency =
 		Library.Get(ThemeManager.CurrentTheme, { "BackgroundTransparency" }, Window.BackgroundTransparency)
@@ -3815,6 +3843,586 @@ function Library:Window(Data)
 			return Methods, Body
 		end
 
+		function Elements:Colorpicker(Data)
+			Data = Data or {}
+			local Methods = {}
+			local Body = Library.SetupBody(Data)
+
+			local Interaction = Body.Interaction :: Frame
+			local Header = Body.Header :: Frame
+			local ElementBody = Body.ElementBody :: TextButton
+			ElementBody.Parent = Container
+
+			Interaction.Size = UDim2.fromScale(0.33, 0)
+			Header.Size = UDim2.fromScale(0.67, 0)
+
+			local Color = Library.New("Frame", {
+				Name = "Color",
+				LayoutOrder = 2,
+				Size = UDim2.new(0, 35, 0, 35),
+				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+				Parent = Interaction,
+			})
+
+			Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.Medium), Parent = Color })
+
+			local ColorSelection = Library.New("Frame", {
+				Name = "ColorSelection",
+				LayoutOrder = 1,
+				Size = UDim2.new(0, 0, 0, 35),
+				AutomaticSize = Enum.AutomaticSize.X,
+				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+				BackgroundTransparency = 0.95,
+				Parent = Interaction,
+			})
+
+			Library.New("UICorner", { CornerRadius = UDim.new(0, Library.CornerPhases.Low), Parent = ColorSelection })
+
+			Library.New("UIPadding", {
+				PaddingTop = UDim.new(0, 3),
+				PaddingBottom = UDim.new(0, 3),
+				PaddingLeft = UDim.new(0, 8),
+				PaddingRight = UDim.new(0, 8),
+				Parent = ColorSelection,
+			})
+
+			local ColorLabel = Library.New("TextLabel", {
+				Name = "Color3",
+				AutomaticSize = Enum.AutomaticSize.XY,
+				BackgroundTransparency = 1,
+				Text = "255, 255, 255",
+				TextColor3 = Color3.fromRGB(255, 255, 255),
+				TextSize = 14,
+				TextTransparency = 0.2,
+				TextWrapped = true,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextTruncate = Enum.TextTruncate.SplitWord,
+				FontFace = Font.new("rbxassetid://16658221428", Enum.FontWeight.SemiBold),
+				RichText = true,
+				Parent = ColorSelection,
+			})
+
+			Library.New("UIListLayout", {
+				FillDirection = Enum.FillDirection.Horizontal,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 4),
+				Parent = ColorSelection,
+			})
+
+			local function Section(Parent, Title)
+				local Section = Library.New("Frame", {
+					Name = "Section",
+					ZIndex = 2,
+					Size = UDim2.new(1, 0, 0, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					BackgroundTransparency = 1,
+					Parent = Parent,
+				})
+
+				Library.New("UIListLayout", {
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					Padding = UDim.new(0, 4),
+					Parent = Section,
+				})
+
+				Library.New("UIPadding", {
+					PaddingTop = UDim.new(0, 3),
+					PaddingBottom = UDim.new(0, 3),
+					PaddingLeft = UDim.new(0, 9),
+					PaddingRight = UDim.new(0, 9),
+					Parent = Section,
+				})
+
+				Library.New("UICorner", { CornerRadius = UDim.new(0, 8), Parent = Section })
+
+				Library.New("TextLabel", {
+					Name = "Title",
+					ZIndex = 2,
+					LayoutOrder = -1,
+					AutomaticSize = Enum.AutomaticSize.XY,
+					BackgroundTransparency = 1,
+					Text = Title,
+					TextColor3 = Color3.fromRGB(255, 255, 255),
+					TextSize = 16,
+					TextTransparency = 0.2,
+					FontFace = Font.new("rbxassetid://16658221428", Enum.FontWeight.Medium),
+					Parent = Section,
+				})
+
+				return Section
+			end
+
+			local function Row(Parent, Label)
+				local Row = Library.New("Frame", {
+					Name = "Row",
+					ZIndex = 2,
+					Size = UDim2.new(0, 0, 0, 0),
+					AutomaticSize = Enum.AutomaticSize.XY,
+					BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+					BackgroundTransparency = 0.95,
+					Parent = Parent,
+				})
+
+				Library.New("UICorner", { CornerRadius = UDim.new(0, 8), Parent = Row })
+				Library.New("UIPadding", {
+					PaddingTop = UDim.new(0, 9),
+					PaddingBottom = UDim.new(0, 9),
+					PaddingLeft = UDim.new(0, 9),
+					PaddingRight = UDim.new(0, 9),
+					Parent = Row,
+				})
+
+				local Label = Library.New("TextLabel", {
+					Name = "StringValue",
+					ZIndex = 2,
+					AutomaticSize = Enum.AutomaticSize.XY,
+					BackgroundTransparency = 1,
+					Text = Label,
+					TextColor3 = Color3.fromRGB(255, 255, 255),
+					TextSize = 15,
+					TextTransparency = 0.6,
+					TextWrapped = true,
+					TextTruncate = Enum.TextTruncate.SplitWord,
+					FontFace = Font.new("rbxassetid://16658221428", Enum.FontWeight.SemiBold),
+					RichText = true,
+					Parent = Row,
+				})
+
+				return Label
+			end
+
+			--// Logic
+			local InitialColor = Library.Get(Data, { "Default", "Value", "Color" }, Color3.fromRGB(255, 255, 255))
+			local Hue, Sat, Val = Color3.toHSV(InitialColor)
+
+			local Callback = Signal:Callback(Data.Callback)
+			local Changed = Signal.New()
+			local PopupOpen = Signal.New()
+			local PopupClose = Signal.New()
+
+			local _ColorPicker = Library.New("Folder", { Name = "Colorpicker", Parent = Controller.PopupOverlay })
+
+			Library.New("UIListLayout", {
+				FillDirection = Enum.FillDirection.Horizontal,
+				HorizontalAlignment = Enum.HorizontalAlignment.Center,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 0),
+				Parent = _ColorPicker,
+			})
+
+			local Board = Library.New("Frame", {
+				Name = "Board",
+				ZIndex = -1,
+				Position = UDim2.new(0.4, 0, 0.502, 0),
+				Size = UDim2.new(0, 330, 0, 0),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+				BackgroundTransparency = 0.95,
+				Parent = _ColorPicker,
+			})
+
+			Library.New("UICorner", { CornerRadius = UDim.new(0, 15), Parent = Board })
+
+			Library.New("UIPadding", {
+				PaddingTop = UDim.new(0, 8),
+				PaddingBottom = UDim.new(0, 10),
+				PaddingLeft = UDim.new(0, 8),
+				PaddingRight = UDim.new(0, 8),
+				Parent = Board,
+			})
+
+			Library.New("UIListLayout", {
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 8),
+				Parent = Board,
+			})
+
+			local ColorBox = Library.New("Frame", {
+				Name = "ColorBox",
+				ZIndex = 2,
+				Size = UDim2.new(0, 314, 0, 270),
+				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+				Active = true,
+				Parent = Board,
+			})
+
+			Library.New("UICorner", { CornerRadius = UDim.new(0, 15), Parent = ColorBox })
+
+			local HueGradient = Library.New("UIGradient", {
+				Rotation = 0,
+				Color = ColorSequence.new({
+					ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+					ColorSequenceKeypoint.new(1, Color3.fromHSV(Hue, 1, 1)),
+				}),
+				Parent = ColorBox,
+			})
+
+			local DarknessOverlay = Library.New("Frame", {
+				Name = "DarknessOverlay",
+				ZIndex = 2,
+				Size = UDim2.new(1, 0, 1, 0),
+				BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+				BackgroundTransparency = 0,
+				Parent = ColorBox,
+			})
+
+			Library.New("UICorner", { CornerRadius = UDim.new(0, 13), Parent = DarknessOverlay })
+
+			Library.New("UIGradient", {
+				Rotation = 90,
+				Color = ColorSequence.new(Color3.fromRGB(0, 0, 0)),
+				Transparency = NumberSequence.new({
+					NumberSequenceKeypoint.new(0, 1),
+					NumberSequenceKeypoint.new(1, 0),
+				}),
+				Parent = DarknessOverlay,
+			})
+
+			local BoxCursor = Library.New("Frame", {
+				Name = "Cursor",
+				ZIndex = 3,
+				Size = UDim2.new(0, 10, 0, 10),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+				Parent = ColorBox,
+			})
+
+			Library.New("UICorner", { CornerRadius = UDim.new(1, 0), Parent = BoxCursor })
+			Library.New("UIStroke", { Color = Color3.fromRGB(0, 0, 0), Thickness = 1.5, Parent = BoxCursor })
+
+			local ColorSlider = Library.New("Frame", {
+				Name = "ColorSlider",
+				ZIndex = 2,
+				Size = UDim2.new(1, 0, 0, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundTransparency = 1,
+				Parent = Board,
+			})
+
+			Library.New("UICorner", { CornerRadius = UDim.new(0, 15), Parent = ColorSlider })
+			Library.New("UIListLayout", {
+				FillDirection = Enum.FillDirection.Horizontal,
+				HorizontalAlignment = Enum.HorizontalAlignment.Center,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 15),
+				Parent = ColorSlider,
+			})
+
+			local ColorGradiation = Library.New("Frame", {
+				Name = "ColorGradiation",
+				ZIndex = 2,
+				Size = UDim2.new(0.95, 0, 0, 18),
+				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+				Active = true,
+				Parent = ColorSlider,
+			})
+
+			Library.New("UICorner", { CornerRadius = UDim.new(1, 0), Parent = ColorGradiation })
+
+			Library.New("UIGradient", {
+				Color = ColorSequence.new({
+					ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+					ColorSequenceKeypoint.new(0.167, Color3.fromRGB(255, 255, 0)),
+					ColorSequenceKeypoint.new(0.333, Color3.fromRGB(0, 255, 0)),
+					ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)),
+					ColorSequenceKeypoint.new(0.667, Color3.fromRGB(0, 0, 255)),
+					ColorSequenceKeypoint.new(0.833, Color3.fromRGB(255, 0, 255)),
+					ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0)),
+				}),
+				Parent = ColorGradiation,
+			})
+
+			local HueDot = Library.New("Frame", {
+				Name = "Dot",
+				ZIndex = 2,
+				Size = UDim2.new(0, 8, 0, 8),
+				Position = UDim2.new(0, 0, 0.5, 0),
+				AnchorPoint = Vector2.new(0, 0.5),
+				BackgroundColor3 = Color3.fromHSV(Hue, 1, 1),
+				Parent = ColorGradiation,
+			})
+
+			Library.New("UICorner", { CornerRadius = UDim.new(1, 0), Parent = HueDot })
+			Library.New("UIStroke", { Color = Color3.fromRGB(255, 255, 255), Thickness = 3, Parent = HueDot })
+
+			local Darkness = Library.New("Frame", {
+				Name = "Darkness",
+				ZIndex = 2,
+				LayoutOrder = 3,
+				Size = UDim2.new(1, 0, 0, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundTransparency = 1,
+				Parent = Board,
+			})
+
+			Library.New("UICorner", { CornerRadius = UDim.new(0, 15), Parent = Darkness })
+			Library.New("UIListLayout", {
+				FillDirection = Enum.FillDirection.Horizontal,
+				HorizontalAlignment = Enum.HorizontalAlignment.Center,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 15),
+				Parent = Darkness,
+			})
+
+			local DarknessSlider = Library.New("Frame", {
+				Name = "DarknessSlider",
+				ZIndex = 2,
+				Size = UDim2.new(0.95, 0, 0, 18),
+				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+				Active = true,
+				Parent = Darkness,
+			})
+
+			Library.New("UICorner", { CornerRadius = UDim.new(1, 0), Parent = DarknessSlider })
+
+			Library.New("UIGradient", {
+				Color = ColorSequence.new({
+					ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+					ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0)),
+				}),
+				Parent = DarknessSlider,
+			})
+
+			local DarknessDot = Library.New("Frame", {
+				Name = "Dot",
+				ZIndex = 2,
+				Size = UDim2.new(0, 8, 0, 8),
+				Position = UDim2.new(0, 0, 0.5, 0),
+				AnchorPoint = Vector2.new(0, 0.5),
+				BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+				Parent = DarknessSlider,
+			})
+
+			Library.New("UICorner", { CornerRadius = UDim.new(1, 0), Parent = DarknessDot })
+			Library.New("UIStroke", { Color = Color3.fromRGB(255, 255, 255), Thickness = 3, Parent = DarknessDot })
+
+			local DataBoard = Library.New("Frame", {
+				Name = "DataBoard",
+				ZIndex = 2,
+				Size = UDim2.new(0.2, 0, 0.682, 0),
+				Position = UDim2.new(0.83, 0, 0.567, 0),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundTransparency = 1,
+				Parent = _ColorPicker,
+			})
+
+			Library.New("UIListLayout", {
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 6),
+				Parent = DataBoard,
+			})
+
+			local RGBSection = Section(DataBoard, "RGB")
+			local _Red = Row(RGBSection, "RED: 255")
+			local _Green = Row(RGBSection, "GREEN: 0")
+			local _Blue = Row(RGBSection, "BLUE: 0")
+
+			local HEXSection = Section(DataBoard, "HEX Code")
+			local _Hex = Row(HEXSection, "CODE: #ff0000")
+
+			local HSVSection = Section(DataBoard, "HSV")
+			local _Hue = Row(HSVSection, "HUE: 0")
+			local _Sat = Row(HSVSection, "SAT: 255")
+			local _Val = Row(HSVSection, "VAL: 255")
+
+			local DragBox, DragHue, DragDarkness = false, false, false
+
+			local function Refresh(Input, _Callback)
+				if Input then
+					if DragBox then
+						local AbsoluteSize = ColorBox.AbsoluteSize
+						local AbsolutePos = ColorBox.AbsolutePosition
+
+						Sat = math.clamp((Input.Position.X - AbsolutePos.X) / AbsoluteSize.X, 0, 1)
+						Val = 1 - math.clamp((Input.Position.Y - AbsolutePos.Y) / AbsoluteSize.Y, 0, 1)
+					elseif DragHue then
+						local AbsoluteSize = ColorGradiation.AbsoluteSize
+						local AbsolutePos = ColorGradiation.AbsolutePosition
+
+						Hue = math.clamp((Input.Position.X - AbsolutePos.X) / AbsoluteSize.X, 0, 0.999999)
+					elseif DragDarkness then
+						local AbsoluteSize = DarknessSlider.AbsoluteSize
+						local AbsolutePos = DarknessSlider.AbsolutePosition
+
+						Val = 1 - math.clamp((Input.Position.X - AbsolutePos.X) / AbsoluteSize.X, 0, 1)
+					end
+				end
+
+				local CurrentColor = Color3.fromHSV(Hue, Sat, Val)
+				local R = math.floor(CurrentColor.R * 255 + 0.5)
+				local G = math.floor(CurrentColor.G * 255 + 0.5)
+				local B = math.floor(CurrentColor.B * 255 + 0.5)
+
+				Color.BackgroundColor3 = CurrentColor
+				ColorLabel.Text = R .. ", " .. G .. ", " .. B
+
+				_Red.Text = "RED: " .. R
+				_Green.Text = "GREEN: " .. G
+				_Blue.Text = "BLUE: " .. B
+				_Hex.Text = "CODE: #" .. CurrentColor:ToHex()
+
+				_Hue.Text = "HUE: " .. math.floor(Hue * 360 + 0.5)
+				_Sat.Text = "SAT: " .. math.floor(Sat * 255 + 0.5)
+				_Val.Text = "VAL: " .. math.floor(Val * 255 + 0.5)
+
+				HueGradient.Color = ColorSequence.new({
+					ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+					ColorSequenceKeypoint.new(1, Color3.fromHSV(Hue, 1, 1)),
+				})
+
+				HueDot.BackgroundColor3 = Color3.fromHSV(Hue, 1, 1)
+				HueDot.Position = UDim2.new(Hue, 0, 0.5, 0)
+
+				BoxCursor.Position = UDim2.new(Sat, 0, 1 - Val, 0)
+
+				DarknessDot.Position = UDim2.new(1 - Val, 0, 0.5, 0)
+				DarknessDot.BackgroundColor3 = Color3.fromHSV(0, 0, Val)
+
+				Changed:Fire(R, G, B)
+
+				if _Callback then
+					Callback:Fire(Color3.fromRGB(R, G, B))
+				end
+			end
+
+			ColorBox.InputBegan:Connect(function(Input)
+				if
+					Input.UserInputType == Enum.UserInputType.MouseButton1
+					or Input.UserInputType == Enum.UserInputType.Touch
+				then
+					DragBox = true
+					Refresh(Input, true)
+				end
+			end)
+
+			ColorGradiation.InputBegan:Connect(function(Input)
+				if
+					Input.UserInputType == Enum.UserInputType.MouseButton1
+					or Input.UserInputType == Enum.UserInputType.Touch
+				then
+					DragHue = true
+					Refresh(Input, true)
+				end
+			end)
+
+			DarknessSlider.InputBegan:Connect(function(Input)
+				if
+					Input.UserInputType == Enum.UserInputType.MouseButton1
+					or Input.UserInputType == Enum.UserInputType.Touch
+				then
+					DragDarkness = true
+					Refresh(Input, true)
+				end
+			end)
+
+			UserInputService.InputChanged:Connect(function(Input)
+				if
+					Input.UserInputType ~= Enum.UserInputType.MouseMovement
+					and Input.UserInputType ~= Enum.UserInputType.Touch
+				then
+					return
+				end
+
+				if DragBox or DragHue or DragDarkness then
+					Refresh(Input, true)
+				end
+			end)
+
+			UserInputService.InputEnded:Connect(function(Input)
+				if
+					Input.UserInputType == Enum.UserInputType.MouseButton1
+					or Input.UserInputType == Enum.UserInputType.Touch
+				then
+					DragBox = false
+					DragHue = false
+					DragDarkness = false
+				end
+			end)
+
+			_ColorPicker.Parent = nil
+			Board.Visible = false
+			DataBoard.Visible = false
+
+			ElementBody.MouseButton1Click:Connect(function()
+				PopupOpen:Fire()
+			end)
+
+			PopupOpen:Connect(function()
+				_ColorPicker.Parent = Controller.PopupOverlay
+				Controller.StartPopup:Fire()
+				Board.Visible = true
+				DataBoard.Visible = true
+			end)
+
+			UserInputService.InputBegan:Connect(function(Input, GameProcessed)
+				if not _ColorPicker.Parent or GameProcessed then
+					return
+				end
+
+				if
+					Input.UserInputType ~= Enum.UserInputType.MouseButton1
+					and Input.UserInputType ~= Enum.UserInputType.Touch
+				then
+					return
+				end
+
+				local Point = Input.Position
+				local BoardPos, BoardSize = Board.AbsolutePosition, Board.AbsoluteSize
+				local DataPos, DataSize = DataBoard.AbsolutePosition, DataBoard.AbsoluteSize
+				local ElementPos, ElementSize = ElementBody.AbsolutePosition, ElementBody.AbsoluteSize
+
+				local InBoard = Point.X >= BoardPos.X
+					and Point.X <= BoardPos.X + BoardSize.X
+					and Point.Y >= BoardPos.Y
+					and Point.Y <= BoardPos.Y + BoardSize.Y
+				local InData = Point.X >= DataPos.X
+					and Point.X <= DataPos.X + DataSize.X
+					and Point.Y >= DataPos.Y
+					and Point.Y <= DataPos.Y + DataSize.Y
+				local InElement = Point.X >= ElementPos.X
+					and Point.X <= ElementPos.X + ElementSize.X
+					and Point.Y >= ElementPos.Y
+					and Point.Y <= ElementPos.Y + ElementSize.Y
+
+				if not InBoard and not InData and not InElement then
+					PopupClose:Fire()
+					Controller.EndPopup:Fire()
+				end
+			end)
+
+			PopupClose:Connect(function()
+				_ColorPicker.Parent = nil
+				Board.Visible = false
+				DataBoard.Visible = false
+
+				Refresh(nil, true)
+			end)
+
+			Refresh(nil, false)
+
+			function Methods:Set(NewColor, FireCallback)
+				Hue, Sat, Val = Color3.toHSV(NewColor)
+				Refresh(nil, FireCallback == true)
+			end
+
+			function Methods:Get()
+				local CurrentColor = Color3.fromHSV(Hue, Sat, Val)
+				return math.floor(CurrentColor.R * 255 + 0.5),
+					math.floor(CurrentColor.G * 255 + 0.5),
+					math.floor(CurrentColor.B * 255 + 0.5)
+			end
+
+			Methods.Changed = Changed
+			Methods.PopupOpen = PopupOpen
+			Methods.PopupClose = PopupClose
+
+			return Methods, Body
+		end
+
 		function Elements:Section(Data)
 			Data = Data or {}
 			local Methods = {}
@@ -4157,9 +4765,10 @@ function Library:Window(Data)
 
 			ElementBody.MouseButton1Click:Connect(function()
 				if Blank then
+					--// Open:Fire()
 					return
 				end
-								
+
 				Opened = not Opened
 
 				if Opened then
@@ -4919,6 +5528,34 @@ function Library:Window(Data)
 		})
 	end
 
+	Controller.StartPopup:Connect(function()
+		if not Controller.PopupOverlay then
+			return
+		end
+
+		Signal:Animate(
+			PopupOverlay,
+			{ Time = 0.25, Style = Enum.EasingStyle.Sine, Direction = Enum.EasingDirection.Out },
+			{ BackgroundTransparency = 0.3 }
+		)
+
+		Controller.CurrentOverlay.ZIndex = 1
+	end)
+
+	Controller.EndPopup:Connect(function()
+		if not Controller.PopupOverlay then
+			return
+		end
+
+		Signal:Animate(
+			PopupOverlay,
+			{ Time = 0.25, Style = Enum.EasingStyle.Sine, Direction = Enum.EasingDirection.Out },
+			{ BackgroundTransparency = 1 }
+		)
+
+		Controller.CurrentOverlay.ZIndex = 5
+	end)
+
 	if Data.Profile then
 		local Profile = Library.New("Frame", {
 			Name = "Profile",
@@ -4956,7 +5593,7 @@ function Library:Window(Data)
 
 		local ProfileIcon = Library.New("ImageLabel", {
 			Name = "Icon",
-			LayoutOrder = -1,
+			LayoutOrder = 1,
 			Position = UDim2.new(0.195, 0, 0.5, 0),
 			Size = UDim2.new(0, 45, 0, 45),
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -5160,6 +5797,7 @@ function Library:Window(Data)
 end
 
 --// Notification
+
 function Library:Notify(Data)
 	Data = Data or {}
 	local Notification = Library.New("Frame", {
