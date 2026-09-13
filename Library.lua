@@ -4156,6 +4156,10 @@ function Library:Window(Data)
 			end)
 
 			ElementBody.MouseButton1Click:Connect(function()
+				if Blank then
+					return
+				end
+								
 				Opened = not Opened
 
 				if Opened then
