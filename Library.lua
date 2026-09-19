@@ -5944,6 +5944,7 @@ function Library:Notify(Data)
 		BackgroundTransparency = 1,
 		Text = Library.Get(Data, { "Content" }, ""),
 		Role = "Text",
+		RichText = true,
 		TextSize = 16,
 		TextTransparency = 0.4000000059604645,
 		TextWrapped = true,
