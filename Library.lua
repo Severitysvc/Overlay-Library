@@ -5680,8 +5680,6 @@ function Library:Window(Data)
 							{ Time = 0.25, Style = Enum.EasingStyle.Sine, Direction = Enum.EasingDirection.Out },
 							{ PaddingLeft = CurrentPadding }
 						)
-
-						Animation.Completed:Wait()
 					end
 				end
 			end)
@@ -5705,8 +5703,6 @@ function Library:Window(Data)
 							{ Time = 0.25, Style = Enum.EasingStyle.Sine, Direction = Enum.EasingDirection.Out },
 							{ PaddingLeft = LeftPadding, PaddingRight = RightPadding }
 						)
-
-						Animation.Completed:Wait()
 					end
 				end
 			end)
