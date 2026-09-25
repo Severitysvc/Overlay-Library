@@ -1,404 +1,549 @@
 local Library = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Overlay"))
 local Signal = Library.Signal
 
-Library.SetLibraryDebugs(true) --// Enables Signal:Debug, this is important if you have an issue and you want to see any warnings. [function Library.SetLibraryDebugs(Bool: boolean): ()]
-Library.SetHidden(true) --// Hides the UI and makes it harder to read. [function Library.SetHidden(Bool: boolean): ()]
+Library.Hidden = true --// Makes the ui harder to read
+Library.LibraryDebugs = true --// Enables error calling
 
-Signal:Debug("Library Loaded", "Loading Thread") --// [function Signal:Debug<a, b, c>(Input: b, Thread: c): ()]
+Library:SetIconPack("Solar") --// https://github.com/Footagesus/Icons
 
-local OnActionFired = Signal.New() --// Creates a new signal [Note: if you use Signal.New, the library will disconnect it when closing, use if you want to unbind any connection when the user destroys the ui]
 local IsMobile = Library.IsMobile
+local IsStudio = Library.IsStudio
 
-if IsMobile then
-	Signal:Debug("Mobile Device Detected", "Device Check Thread")
+Library:SetGlobal("Waves", "rbxassetid://82295031952284")
+local Global = Library.Global
 
-	Library:Notify({
-		Title = "Device Detection",
-		Content = "Library has been optimized for mobile devices.", --// If you don't want the content to show, set it to "" or nil or don't define it.
-		--// [Alternative] Message = "Library has been optimized for mobile devices.",
-		Icon = "rbxassetid://134070681746662", --// If you don't want the Icon to show, set it to "" or nil or don't define it.
-		Background = "rbxassetid://82295031952284", --// If you don't want the Background to show, set it to "" or nil or don't define it.
-		--// [Alt] BackgroundImage = = "rbxassetid://82295031952284",
-		Duration = 100, --// [Seconds, how much the notification will be displayed for]
-		CloseType = "Button", --// The method of closing the notification early [Button: will display an 'x' button, Body: Will close the notification when clicking the Notification]
-		Buttons = {
-			{
-				Title = "Close",
-				DestroyOnClick = true, --// Destroys the notification when clicked
-				Callback = function() end, --// Ignored if DestroyOnClick is enabled
-			},
-
-			{
-				Title = "Load Mobile UI",
-				Callback = function()
-					print("loaded mobile ui")
-				end,
-			},
-		},
-	})
-end
-
-OnActionFired:Connect(function(Argument1: string, Argument2: string)
-	Library:Notify({
-		Title = Argument1,
-		Content = Argument2,
-		Icon = "rbxassetid://134070681746662",
-		CloseType = "Button",
-		Background = "rbxassetid://82295031952284",
-		Duration = 5,
+local Notify = Signal.New()
+Notify:Connect(function(Title, Content)
+	local Notification = Library:Notify({
+		Title = Title,
+		Content = Content,
+		Icon = "Info",
+		Background = Global.Waves,
+		Close = "Body Click",
 	})
 end)
 
---// Themes:
-local CurrentThemes = Library:GetThemes() --// Default Themes: {"Dark", "Light", "Crimson", "Midnight", "Sunrise", "Glass", "Black Glass"}
-Library:CreateTheme({
-	Name = "Cyan Glass", --// Important: this will show when using Library:GetThemes() and you will need to use this name when using Library:SetTheme()
-	BackgroundColor = Color3.fromRGB(0, 238, 255), --// BackgroundColor, Eg: Notification, DropdownContextMenu, Window
-	BackgroundTransparency = 0.9, --// Transparency of the background, this includes: Notification, DropdownContextMenu, Window
-	AccentColor = Color3.fromRGB(119, 239, 255), --// Accent color, Eg: Toggle, Button, Dropdown Background (use something light)
-	TextColor = Color3.fromRGB(183, 238, 255), --// Text Color (Use Something light)
-	IconColor = Color3.fromRGB(52, 208, 255), --// Icon Color (Use Something light)
-})
-
-Library:CreateTheme({
-	Name = "Midnight Glass", --// Important: this will show when using Library:GetThemes() and you will need to use this name when using Library:SetTheme()
-	BackgroundColor = Color3.fromRGB(101, 122, 255), --// BackgroundColor, Eg: Notification, DropdownContextMenu, Window
-	BackgroundTransparency = 0.9, --// Transparency of the background, this includes: Notification, DropdownContextMenu, Window
-	AccentColor = Color3.fromRGB(101, 122, 255), --// Accent color, Eg: Toggle, Button, Dropdown Background (use something light)
-	TextColor = Color3.fromRGB(193, 201, 255), --// Text Color (Use Something light)
-	IconColor = Color3.fromRGB(164, 176, 255), --// Icon Color (Use Something light)
-})
-
-local NewThemes = Library:GetThemes() --// Default Themes + The newly added theme: {"Dark", "Light", "Crimson", "Midnight", "Sunrise", "Glass", "Black Glass", "Blue Glass", "Midnight Glass"}
 local Window, Body = Library:Window({
-	Title = "Perseus Hub",
-	SubTitle = "Made By Severitysvc", --// If you don't want the content to show, set it to "" or nil or don't define it.
+	TITLE = "Overlay Window Example",
+	subtitle = "Made by severitysvc | Version 1.1",
 
-	WindowSize = UDim2.fromOffset(700, 500), --// Recommended to use offsets, Default is 700x500
+	WindowSize = UDim2.fromOffset(700, 500),
 	UIScale = 1,
 
 	Minimized = false,
 	MinimizeKeybind = Enum.KeyCode.RightShift,
 
-	Theme = "Dark", --// Note: Do not set Newly Created Themes here, use Library:SetTheme after window creation
-	BackgroundImage = "", --// if you don't want the background image, set it to "" or nil or don't define it.
+	Theme = "Dark",
+	BackgroundImage = "",
 
 	Profile = {
-		AnonymousScreenshot = false, --// Makes the screenshot anonymous
-		UserAnonym = true, --// makes the user anonymous
-		DisplayAnonym = true, --// makes the display anonymous
-		Transparent = false, --// Makes the profile board transparent
-	},
-
-	ImageCorners = {
-		TopLeft = {
-			Color = Color3.fromRGB(0, 0, 0),
-			Transparency = 0.8,
-		},
-
-		TopRight = {
-			Color = Color3.fromRGB(0, 0, 0),
-			Transparency = 0.8,
-		},
-
-		DownLeft = {
-			Color = Color3.fromRGB(0, 0, 0),
-			Transparency = 0.9,
-		},
-
-		DownRight = {
-			Color = Color3.fromRGB(0, 0, 0),
-			Transparency = 0.9,
-		},
+		AnonymousScreenshot = false,
+		UserAnonym = true,
+		DisplayAnonym = true,
+		Transparent = true,
 	},
 })
 
-local OnMinimize = Window.OnMinimize --// Will get fired when the window is minimized
-local OnDestroy = Window.OnDestroy --// Will get fired when the window gets destroyed
-
-if IsMobile then
-	Window:SetUIScale(0.7) --// Recommended ui scale for mobile devices
-end
-
---// Window Methods
 Window:SetBackgroundImage("rbxassetid://82295031952284")
 Window:SetBackgroundImageTransparency(0.9)
 
---// Topbar button
-Window:NewTopbarButton({
-	Icon = "rbxassetid://134070681746662",
-	Order = 1, --// The bigger the order is, the closer it is to the right, go beyond 999 if you want it to display in front of the close and minimize buttons
-	Callback = function()
-		Library:Notify({
-			Title = "Discord Invite Copied!",
-			Background = "rbxassetid://82295031952284",
-			CloseType = "Body",
-			Duration = 5,
-		})
-	end,
-})
+local Title = Window.Title
+local Subtitle = Window.SubTitle
 
---// Interaction Button (displayed on the sidebar)
-Window:NewInteractionButton({
-	Order = 1, --// The bigger the order is, the closer it is to the left
-	Icon = "rbxassetid://111039484684928",
-	Callback = function()
-		Window:SetWindowTransparency(0.8)
-	end,
-})
+Title.TextSize = 17
+Title.TextTransparency = 0.4
 
---// Tabs
-local Tabs = {}
-local Tab = Window:Tab({
-	Title = "Tab Example",
-	Description = "This is an example of a tab", --// Will only show when 'Section' is defined
-	Icon = "rbxassetid://91164200324199", --// If you don't want the Icon to show, set it to "" or nil or don't define it.
-	Section = { --// If you don't want the Section to show, simply don't define it
-		ShowIcon = true, --// Weather the tab icon shows on the section, will not show if icon is nil/undefined
-	},
-	Callback = function()
-		Window:SetBackgroundImage("rbxassetid://133748586430296")
-		Window:SetBackgroundImageTransparency(0.6)
-	end,
-})
+local OnMinimize = Window.OnMinimize
+local OnDestroy = Window.OnDestroy
 
-Window:Divider({ --// Creates a line
-	Size = 0.8,
-	Transparency = 0.9,
-})
+OnMinimize:Connect(function()
+	Notify:Fire("Library Action", "Use " .. Window.MinimizeKeybind.Name .. " to open the ui")
+end)
 
-local Section = Window:Section({
-	Title = "Section Example",
-	Icon = "rbxassetid://91164200324199",
+local Overview = Window:Section({
+	Title = "Overview",
+	Transparency = "Max",
 	Opened = true,
 })
 
-local Overview = Section:Tab({
-	Title = "Overview",
-	Description = "Overview your stats",
-	Icon = "rbxassetid://92502305278637",
+local Dashboard = Overview:Tab({
+	Title = "Dashboard",
+	Description = "Manage you client",
+	Icon = "rbxassetid://91164200324199",
+})
+
+local Personalization = Overview:Tab({
+	Title = "Personalization",
+	Description = "Customiza the interface",
+	Icon = "rbxassetid://89335485534775",
 	Section = {
 		ShowIcon = false,
 	},
 })
 
-Overview.OnSelect:Connect(function() --// Fires when tab is selected
-	Window:SetBackgroundImage("rbxassetid://133748586430296")
-	Window:SetBackgroundImageTransparency(0.6)
-	Body.BackgroundImage.ImageColor3 = Color3.fromRGB(40, 40, 40)
+Dashboard:Select()
 
-	Window:SetCornerProperty("DownLeft", "ImageColor3", Color3.fromRGB(0, 110, 255))
-	Window:SetCornerProperty("DownLeft", "Visible", true)
+task.spawn(function() --// Themes
+	Library:CreateTheme({
+		Name = "Slate",
+		BackgroundColor = Color3.fromRGB(13, 16, 23),
+		BackgroundTransparency = 0.15,
+		AccentColor = Color3.fromRGB(88, 166, 255),
+		TextColor = Color3.fromRGB(230, 237, 243),
+		IconColor = Color3.fromRGB(160, 175, 195),
+	})
+
+	Library:CreateTheme({
+		Name = "Ember",
+		BackgroundColor = Color3.fromRGB(25, 18, 15),
+		BackgroundTransparency = 0.15,
+		AccentColor = Color3.fromRGB(255, 135, 50),
+		TextColor = Color3.fromRGB(245, 240, 235),
+		IconColor = Color3.fromRGB(195, 160, 140),
+	})
+
+	Library:CreateTheme({
+		Name = "Forest",
+		BackgroundColor = Color3.fromRGB(13, 23, 16),
+		BackgroundTransparency = 0.15,
+		AccentColor = Color3.fromRGB(50, 200, 100),
+		TextColor = Color3.fromRGB(235, 245, 240),
+		IconColor = Color3.fromRGB(150, 180, 160),
+	})
+
+	Library:CreateTheme({
+		Name = "Aqua",
+		BackgroundColor = Color3.fromRGB(10, 20, 25),
+		BackgroundTransparency = 0.15,
+		AccentColor = Color3.fromRGB(0, 220, 255),
+		TextColor = Color3.fromRGB(230, 245, 250),
+		IconColor = Color3.fromRGB(140, 180, 195),
+	})
+
+	Library:CreateTheme({
+		Name = "Blossom",
+		BackgroundColor = Color3.fromRGB(25, 15, 22),
+		BackgroundTransparency = 0.15,
+		AccentColor = Color3.fromRGB(255, 105, 180),
+		TextColor = Color3.fromRGB(250, 235, 245),
+		IconColor = Color3.fromRGB(195, 150, 175),
+	})
+
+	Library:CreateTheme({
+		Name = "Verdant",
+		BackgroundColor = Color3.fromRGB(10, 28, 18),
+		BackgroundTransparency = 0.15,
+		AccentColor = Color3.fromRGB(30, 230, 90),
+		TextColor = Color3.fromRGB(205, 250, 220),
+		IconColor = Color3.fromRGB(100, 220, 140),
+	})
+
+	Library:CreateTheme({
+		Name = "Acvatic",
+		BackgroundColor = Color3.fromRGB(5, 25, 32),
+		BackgroundTransparency = 0.15,
+		AccentColor = Color3.fromRGB(0, 240, 255),
+		TextColor = Color3.fromRGB(195, 245, 255),
+		IconColor = Color3.fromRGB(90, 215, 240),
+	})
+
+	Library:CreateTheme({
+		Name = "Rose Light",
+		BackgroundColor = Color3.fromRGB(250, 242, 245),
+		BackgroundTransparency = 0.15,
+		AccentColor = Color3.fromRGB(240, 130, 175),
+		TextColor = Color3.fromRGB(45, 35, 42),
+		IconColor = Color3.fromRGB(160, 105, 130),
+	})
+
+	Library:CreateTheme({
+		Name = "Cherry Light",
+		BackgroundColor = Color3.fromRGB(252, 242, 243),
+		BackgroundTransparency = 0.15,
+		AccentColor = Color3.fromRGB(235, 75, 90),
+		TextColor = Color3.fromRGB(48, 32, 35),
+		IconColor = Color3.fromRGB(165, 90, 100),
+	})
+
+	Library:CreateTheme({
+		Name = "Sky Light",
+		BackgroundColor = Color3.fromRGB(240, 246, 252),
+		BackgroundTransparency = 0.15,
+		AccentColor = Color3.fromRGB(45, 135, 235),
+		TextColor = Color3.fromRGB(30, 40, 55),
+		IconColor = Color3.fromRGB(110, 145, 175),
+	})
+
+	Library:CreateTheme({
+		Name = "Amber Light",
+		BackgroundColor = Color3.fromRGB(253, 248, 240),
+		BackgroundTransparency = 0.15,
+		AccentColor = Color3.fromRGB(225, 140, 30),
+		TextColor = Color3.fromRGB(50, 42, 35),
+		IconColor = Color3.fromRGB(160, 125, 90),
+	})
+
+	Library:CreateTheme({
+		Name = "Blossom ++",
+		BackgroundColor = Color3.fromRGB(30, 10, 24),
+		BackgroundTransparency = 0.15,
+		AccentColor = Color3.fromRGB(255, 75, 180),
+		TextColor = Color3.fromRGB(255, 210, 238),
+		IconColor = Color3.fromRGB(240, 120, 190),
+	})
+end)
+
+task.spawn(function() --// Dashboard
+	local OnSelect = Dashboard.OnSelect
+	local OnDeselect = Dashboard.OnDeselect
+
+	Dashboard.OnDeselect:Connect(function()
+		Notify:Fire("Action", "Left dashboard tab")
+	end)
+
+	Dashboard:Label({
+		Title = "Welcome, " .. Library.Player.DisplayName,
+	})
+
+	local Banner, Body = Dashboard:ProfileBanner()
+
+	local Main = Dashboard:Section({
+		Blank = true,
+		Transparency = "Max",
+		Opened = true,
+		ElementPadding = 0,
+		ElementCornerSize = 0,
+	})
+
+	Main:Label({
+		Title = "Script Info",
+	})
+
+	Main:BodyLabel({
+		Title = "Discord Invite",
+		Stroke = false,
+		Transparency = "Min",
+		Desc = "Click to copy invite",
+		Value = "https://discord.gg/AVrAKebE9",
+	})
+
+	Main:BodyLabel({
+		Title = "Script version",
+		Stroke = false,
+		Transparency = "Min",
+		Desc = "Current version of the script",
+		Value = "version 1.0.5",
+	})
+
+	Main:BodyLabel({
+		Title = "Executor Name",
+		Stroke = false,
+		Transparency = "Min",
+		Desc = "Name of the executor you're using",
+		Value = "Potassium",
+	})
+
+	Main:BodyLabel({
+		Title = "Server Region",
+		Stroke = false,
+		Transparency = "Min",
+		Desc = "Current server region",
+		Value = "US-East",
+	})
+
+	Main:Label({
+		Title = "Game Info",
+	})
+
+	Main:BodyLabel({
+		Title = "Game Name",
+		Stroke = false,
+		Transparency = "Min",
+		Desc = "Name of the game",
+		Value = "Rivals",
+	})
+
+	Main:BodyLabel({
+		Title = "Job ID",
+		Desc = "Click to copy",
+		Stroke = false,
+		Transparency = "Min",
+		Value = game.JobId,
+		Callback = function()
+			Notify:Fire("Dashboard", "Copied the game job id.")
+		end,
+	})
+
+	Main:BodyLabel({
+		Title = "Players",
+		Stroke = false,
+		Transparency = "Min",
+		Desc = "Number of players in-game.",
+		Value = "1 / 20",
+	})
+
+	Main:BodyLabel({
+		Title = "Server Region",
+		Stroke = false,
+		Transparency = "Min",
+		Desc = "Current server region",
+		Value = "US-East",
+	})
+end)
+
+task.spawn(function() --// Personalization
+	local Animation = ""
+	local Theme = Library:GetTheme()
+
+	Personalization:Keybind({
+		Title = "UI Minimize Keybind",
+		Description = "Click to change the minimize keybind",
+		Value = Window.MinimizeKeybind,
+		Callback = function(Keybind)
+			Window.MinimizeKeybind = Keybind
+		end,
+
+		KeyPressCallback = function()
+			Notify:Fire("Action", "Toggled the window.")
+		end,
+	})
+
+	local Themes = Personalization:Section({
+		Transparency = "Max",
+		Opened = true,
+		Blank = true,
+		ElementPadding = 0,
+		ElementCornerSize = 0,
+	})
+
+	Themes:Label({
+		Title = "Themes",
+	})
+
+	Themes:Dropdown({
+		Title = "Themes",
+		Description = "Select the theme you want",
+		Icon = "solar:pallete-2-bold",
+		Values = Library:GetThemes(),
+		Value = Theme,
+		DropdownIcon = false,
+		Multi = false,
+		Callback = function(Value: StringValue)
+			Theme = Value
+		end,
+	})
+
+	Themes:ColorPicker({
+		Title = "Window Color",
+		Description = "Pick the Window color (will be overwrited by selecting a new theme)",
+		Color = Color3.fromRGB(9, 9, 9),
+		Callback = function(Value)
+			Body.Window.BackgroundColor3 = Value
+		end,
+	})
+
+	Themes:Button({
+		Title = "Apply Selected Theme",
+		Description = "Apply the selected theme",
+		Callback = function()
+			Library:SetTheme(Theme)
+			Notify:Fire("Personalization", "Set theme to: " .. Library:GetTheme())
+		end,
+	})
+
+	local Corners = Personalization:Section({
+		Transparency = "Max",
+		Opened = true,
+		Blank = true,
+		ElementPadding = 0,
+		ElementCornerSize = 0,
+	})
+
+	Corners:Label({
+		Title = "Top Left Corner",
+	})
+
+	Corners:Toggle({
+		Title = "Visible",
+		Description = "Enable / Disable the top left corner glow",
+		Value = true,
+		Callback = function(State)
+			Window:SetCornerProperty("TopLeft", "Visible", State)
+		end,
+	})
+
+	Corners:Slider({
+		Title = "Transparency",
+		Description = "Change the top left glow transparency",
+		Min = 0,
+		Max = 1,
+		Step = 0.01,
+		Value = 0.9,
+		SmoothSlider = true,
+		Callback = function(Value)
+			Window:SetCornerProperty("TopLeft", "ImageTransparency", Value)
+		end,
+	})
+
+	Corners:Label({
+		Title = "Top Right Corner",
+	})
+
+	Corners:Toggle({
+		Title = "Visible",
+		Description = "Enable / Disable the top right corner glow",
+		Value = true,
+		Callback = function(State)
+			Window:SetCornerProperty("TopRight", "Visible", State)
+		end,
+	})
+
+	Corners:Slider({
+		Title = "Transparency",
+		Description = "Change the top right glow transparency",
+		Min = 0,
+		Max = 1,
+		Step = 0.01,
+		Value = 0.9,
+		SmoothSlider = true,
+		Callback = function(Value)
+			Window:SetCornerProperty("TopRight", "ImageTransparency", Value)
+		end,
+	})
+
+	Corners:Label({
+		Title = "Down Left Corner",
+	})
+
+	Corners:Toggle({
+		Title = "Visible",
+		Description = "Enable / Disable the down left corner glow",
+		Value = true,
+		Callback = function(State)
+			Window:SetCornerProperty("DownLeft", "Visible", State)
+		end,
+	})
+
+	Corners:Slider({
+		Title = "Transparency",
+		Description = "Change the down left glow transparency",
+		Min = 0,
+		Max = 1,
+		Step = 0.01,
+		Value = 0.9,
+		SmoothSlider = true,
+		Callback = function(Value)
+			Window:SetCornerProperty("DownLeft", "ImageTransparency", Value)
+		end,
+	})
+
+	Corners:Label({
+		Title = "Down Right Corner",
+	})
+
+	Corners:Toggle({
+		Title = "Visible",
+		Description = "Enable / Disable the down right corner glow",
+		Value = true,
+		Callback = function(State)
+			Window:SetCornerProperty("DownRight", "Visible", State)
+		end,
+	})
+
+	Corners:Slider({
+		Title = "Transparency",
+		Description = "Change the down right glow transparency",
+		Min = 0,
+		Max = 1,
+		Step = 0.01,
+		Value = 0.9,
+		SmoothSlider = true,
+		Callback = function(Value)
+			Window:SetCornerProperty("DownRight", "ImageTransparency", Value)
+		end,
+	})
+
+	local Animations = Personalization:Section({
+		Transparency = "Max",
+		Opened = true,
+		Blank = true,
+		ElementPadding = 0,
+		ElementCornerSize = 0,
+	})
+
+	Animations:Label({
+		Title = "Animations",
+	})
+
+	Animations:Dropdown({
+		Title = "Animation",
+		Description = "Select the animation you want",
+		Icon = "solar:play-circle-bold",
+		Values = { "Parallax" },
+		Value = "Parallax",
+		DropdownIcon = false,
+		Multi = false,
+		Callback = function(Value: StringValue)
+			Animation = Value
+		end,
+	})
+
+	Animations:Button({
+		Title = "Load Animation",
+		Description = "Load the selected animation",
+		Callback = function()
+			if Animation then
+				Notify:Fire("Personalization", "Loaded Animation: " .. Animation)
+
+				if Animation == "Parallax" then
+					Window:LoadAnimation("Parallax", {
+						LightHouseAngle = 10,
+						LightHouseSpeed = 1,
+						LightHouseBobAmplitude = 0.01,
+						LightHouseBobMultipliers = { 1, 1 },
+						LightHouseTiltMultipliers = { 0.8, 0.8 },
+						LightHouseXPositions = { 0.15, 0.75 },
+						LightHouseYPosition = 0.9,
+						WaveAmplitude = 0.05,
+						WaveAmplitudeStep = 1,
+						WaveBaseSpeed = 2,
+						WaveSpeedStep = 0.5,
+						WaveHeight = 0.235,
+					})
+				end
+			end
+		end,
+	})
+
+	Animations:Button({
+		Title = "UnLoad Animation",
+		Description = "UnLoad the selected theme",
+		Callback = function()
+			Window:UnloadAnimation()
+		end,
+	})
+end)
+
+task.spawn(function() --// Corner effects
 	Window:SetCornerProperty("DownLeft", "ImageTransparency", 0.9)
+	Window:SetCornerProperty("DownLeft", "ZIndex", 10)
 
-	Window:SetCornerProperty("DownRight", "ImageColor3", Color3.fromRGB(162, 0, 255))
-	Window:SetCornerProperty("DownRight", "Visible", true)
 	Window:SetCornerProperty("DownRight", "ImageTransparency", 0.9)
+	Window:SetCornerProperty("DownRight", "ZIndex", 10)
+
+	Window:SetCornerProperty("TopRight", "ImageTransparency", 0.9)
+	Window:SetCornerProperty("TopRight", "ZIndex", 10)
+
+	Window:SetCornerProperty("TopLeft", "ImageTransparency", 0.9)
+	Window:SetCornerProperty("TopLeft", "ZIndex", 10)
+
+	game:GetService("RunService").Heartbeat:Connect(function()
+		local Clock = os.clock() * 0.1
+
+		Window:SetCornerProperty("TopRight", "ImageColor3", Color3.fromHSV(Clock % 1, 0.85, 0.3))
+		Window:SetCornerProperty("TopLeft", "ImageColor3", Color3.fromHSV((Clock + 0.08) % 1, 0.85, 0.3))
+
+		Window:SetCornerProperty("DownRight", "ImageColor3", Color3.fromHSV((Clock + 0.16) % 1, 0.85, 0.3))
+		Window:SetCornerProperty("DownLeft", "ImageColor3", Color3.fromHSV((Clock + 0.24) % 1, 0.85, 0.3))
+	end)
 end)
-
-Overview.OnDeselect:Connect(function() --// Fires when tab is selected
-	Window:SetBackgroundImage("rbxassetid://82295031952284")
-	Window:SetBackgroundImageTransparency(0.9)
-	Body.BackgroundImage.ImageColor3 = Color3.fromRGB(255, 255, 255)
-
-	Window:SetCornerProperty("DownLeft", "ImageColor3", Color3.fromRGB(0, 110, 255))
-	Window:SetCornerProperty("DownLeft", "ImageTransparency", 1)
-
-	Window:SetCornerProperty("DownRight", "ImageColor3", Color3.fromRGB(162, 0, 255))
-	Window:SetCornerProperty("DownRight", "ImageTransparency", 1)
-end)
-
-local Profile = Overview:ProfileBanner() --// Creates a profile banner
-local DestroyCopy = Profile:Button({
-	Icon = "rbxassetid://10747384394",
-	Order = 2,
-	Callback = function()
-		Window:Destroy()
-	end,
-})
-
-DestroyCopy.BackgroundColor3 = Color3.fromRGB(253, 115, 115)
-
-local MinimizeCopy = Profile:Button({
-	Icon = "rbxassetid://10734896206",
-	Callback = function()
-		Window:MinimizeWindow()
-	end,
-})
-
-Tabs["Dashboard"] = Tab
-Tabs["Overview"] = Overview
-
---[[
-	GLOBAL ELEMENT PROPRIETIES: [Proprieties that all elements have]
-	
-	[Title, Name]: Title of the element
-	[Description, Desc]: Descrption of the element [Optional]
-	[Transparency]: Transparency of the element [Min, Mid, Max are possible, Min is default]
-	[Icon, Image]: Icon of the element [Optional]
-	[StrokeEnabled, Stroke]: Enables the element stroke [Default is false]
-	[Value, Default]: Value of the object, Depends on the element
-]]
-
-Tab:Select() --// Selects the tab, use Tab:Deselect() to deselect the tab
-
-local SelectedTheme = "Dark"
-Tab:Dropdown({
-	Title = "Old Themes",
-	Description = "This Dropdown displays the old themes",
-	Icon = "", --// If you don't want the Icon to show, set it to "" or nil or don't define it.
-	DropdownIcon = true, --// Weather to show the chevron up and down icon or not.
-	Values = CurrentThemes, --// always requires a table
-	Value = "Dark", --// When using Multi, Wrap the value inside a {}
-	CloseOnSelection = true, --// Closes the DropdownContextMenu when selecting a value [not recommended when using multi]
-	Multi = false, --// Allows multiple values, will return a table on callback
-	Callback = function(Value: StringValue)
-		SelectedTheme = Value
-	end,
-})
-
-Tab:Dropdown({
-	Title = "New Themes",
-	Description = "This Dropdown displays the new themes",
-	DropdownIcon = true,
-	Values = NewThemes,
-	Value = "Dark",
-	Multi = false,
-	Callback = function(Value: StringValue)
-		SelectedTheme = Value
-	end,
-})
-
-Tab:Button({
-	Title = "Apply Selected Theme",
-	Description = "This button applies the selected theme",
-	HeadingButton = "Icon", --// What shows at the end of the button. [Icon: shows a mouse icon, by default, changeable using HeadingIcon; Watermark: Displays a text, Changeable by using HeadingText]
-	HeadingText = "Button", --// The text at the end
-	StrokeEnabled = false, --// Weather the stroke is enabled or not
-	Transparency = "Mid", --// The Transparency phase of the background {Min = 0.95, Mid = 0.985, Max - 1}
-	Callback = function()
-		Window:UnloadAnimation()
-		Library:SetTheme(SelectedTheme)
-	end,
-})
-
-local Player = Overview:Section({
-	Title = "Player Behaviour",
-	Desc = "Change player behaviour",
-	Icon = "rbxassetid://92794817430734", --// Optional
-	Opened = true,
-	ElementPadding = 0,
-	ElementCornerSize = 0,
-	Class = "Watermark", --// Possible Classes: Normal: displays a chevron; Toggle: displays a working toggle, can use callback and value.
-	Watermark = "Change Settings",
-})
-
-Player:BodyLabel({
-	Title = "Player Behaviour",
-	Description = "Configure player behaviour",
-})
-
-Player:Slider({
-	Title = "Walkspeed Changer",
-	Description = "This slider changes walkspeed",
-	Icon = "rbxassetid://92794817430734",
-	Min = 0, --// Minimum Value
-	Max = 100, --// Maximum Value
-	Step = 1, --// Step
-	Value = 16, --// Default value
-	SmoothSlider = true, --// Makes the sliding smooth
-	Callback = function(Value)
-		Library.InitializedPlayer.Character.Humanoid.WalkSpeed = Value
-	end,
-})
-
-Player:Slider({
-	Title = "Jumppower Changer",
-	Description = "This slider changes jumppower",
-	Icon = "",
-	Min = 0, --// Minimum Value
-	Max = 500, --// Maximum Value
-	Step = 1, --// Step
-	Value = 50, --// Default value
-	SmoothSlider = true, --// Makes the sliding smooth
-	Callback = function(Value)
-		Library.InitializedPlayer.Character.Humanoid.JumpPower = Value
-	end,
-})
-
-Player:Divider({
-	Size = 0.9,
-	Transparency = 0.9,
-}) --// This can intrerupt corner sizing
-
-Player:BodyLabel({
-	Title = "Player Options",
-	Icon = "rbxassetid://85552473323403",
-	Description = "Configure additional player behaviour.",
-})
-
-Player:Toggle({
-	Title = "Enable Player Changes",
-	Description = "Toggle the player behaviour settings.",
-	Value = true,
-	Callback = function(Value)
-		print("Player changes enabled:", Value)
-	end,
-})
-
-Player:Dropdown({
-	Title = "Movement Style",
-	Description = "Select a movement style.",
-	Values = { "Default", "Fast", "Slow" },
-	Value = "Default",
-	Callback = function(Value)
-		print("Movement style:", Value)
-	end,
-})
-
-PlayerSettings:Keybind({
-	Title = "Player Action",
-	Description = "Nested keybind example.",
-	Value = Enum.KeyCode.P,
-	Callback = function() end,
-	OnKeyPressed = function()
-		ActionSignal:Fire("Player Action", "The nested keybind callback fired.")
-	end,
-})
-
-
---[[Window:LoadAnimation("Parallax", {
-	--// Lighthouse Config
-	LightHouseAngle = 10, --// Max angle of the lighthouse tilt, [Default: 5]
-	LightHouseSpeed = 1, --// Base speed, [Default: 1]
-	LightHouseBobAmplitude = 0.01, --// Vertical bob,  [Default: 0.008]
-	LightHouseBobMultipliers = { 1, 1 }, --// lighthouse bob strength multiplier, [Default: { 1, 1 }] [Note: 1: FirstLighthouse, 1: Second Lighthouse]
-	LightHouseTiltMultipliers = { 0.8, 0.8 }, --// lighthouse tilt strength multiplier,. [Default: { 1, 1 }]
-	LightHouseXPositions = { 0.15, 0.75 }, --// X position for each lighthouse, [Default: { 0.15, 0.75 }] [Use Scale]
-	LightHouseYPosition = 0.9, --// Y position for all lighthouses, [Default: 0.9] [Use Scale]
-
-	--// Wave Config
-	WaveAmplitude = 0.05, --// Base amount of the growth, [Default: 0.04]
-	WaveAmplitudeStep = 1, --// Extra amplitude for each layer (3 in total), [Default: 0.1]
-	WaveBaseSpeed = 2, --// Base wave speed,[Default: 0.9]
-	WaveSpeedStep = 0.5, --// Speed added to each wave, [Default: 0.4]
-	WaveHeight = 0.235, --// Starting height of each wave, [Default: 0.2] [Use scale]
-})]]
-
-local Undec = Overview:Section({
-	Title = "Player Behaviour",
-	Desc = "Change player behaviour",
-	Icon = "rbxassetid://92794817430734", --// Optional
-	Opened = true,
-	Class = "Normal", --// Possible Classes: Normal: displays a chevron; Toggle: displays a working toggle, can use callback and value.
-})
-
-local Paragraph = Undec:Paragraph({
-	Title = "Paragraph Example",
-	Description = "This is a paragraph example",
-	Icon = "rbxassetid://70746246601910",
-	StrokeEnabled = true,
-})
-
-Paragraph:SetBackgroundColor(Color3.fromRGB(255, 0, 0))
-Paragraph:FillIcon()
