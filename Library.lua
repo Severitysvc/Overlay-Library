@@ -1766,6 +1766,7 @@ function Library:Window(Data)
 	})
 
 	Signal:Track(TitleDisplay)
+	Controller.Title = TitleDisplay
 
 	local SubtitleDisplay = Library.New("TextLabel", {
 		Name = "Subtitle",
@@ -1782,6 +1783,7 @@ function Library:Window(Data)
 	})
 
 	Signal:Track(SubtitleDisplay)
+	Controller.SubTitle = SubtitleDisplay
 
 	local Right = Library.New("Frame", {
 		Name = "Right",
@@ -2426,6 +2428,7 @@ function Library:Window(Data)
 				AutomaticSize = Enum.AutomaticSize.X,
 				BackgroundTransparency = 0.95,
 				LayoutOrder = 1,
+				Role = "Accent",
 				TextTransparency = 1,
 				Text = "",
 				Parent = Interaction,
@@ -4374,7 +4377,6 @@ function Library:Window(Data)
 				local Point = Input.Position
 				local BoardPos, BoardSize = Board.AbsolutePosition, Board.AbsoluteSize
 				local DataPos, DataSize = DataBoard.AbsolutePosition, DataBoard.AbsoluteSize
-				local ElementPos, ElementSize = ElementBody.AbsolutePosition, ElementBody.AbsoluteSize
 
 				local InBoard = Point.X >= BoardPos.X
 					and Point.X <= BoardPos.X + BoardSize.X
@@ -4384,12 +4386,8 @@ function Library:Window(Data)
 					and Point.X <= DataPos.X + DataSize.X
 					and Point.Y >= DataPos.Y
 					and Point.Y <= DataPos.Y + DataSize.Y
-				local InElement = Point.X >= ElementPos.X
-					and Point.X <= ElementPos.X + ElementSize.X
-					and Point.Y >= ElementPos.Y
-					and Point.Y <= ElementPos.Y + ElementSize.Y
 
-				if not InBoard and not InData and not InElement then
+				if not InBoard and not InData then
 					PopupClose:Fire()
 					Controller.EndPopup:Fire()
 				end
@@ -4408,13 +4406,6 @@ function Library:Window(Data)
 			function Methods:Set(NewColor, FireCallback)
 				Hue, Sat, Val = Color3.toHSV(NewColor)
 				Refresh(nil, FireCallback == true)
-			end
-
-			function Methods:Get()
-				local CurrentColor = Color3.fromHSV(Hue, Sat, Val)
-				return math.floor(CurrentColor.R * 255 + 0.5),
-					math.floor(CurrentColor.G * 255 + 0.5),
-					math.floor(CurrentColor.B * 255 + 0.5)
 			end
 
 			Methods.Changed = Changed
@@ -5502,6 +5493,10 @@ function Library:Window(Data)
 
 	--// Animations
 	function Controller:LoadAnimation(Animation, Data)
+		if Controller.LoadedAnimation then
+			return
+		end
+
 		Controller.LoadedAnimation = Library.SetupAnimation(Animation, IgnoreLayout, Data)
 		BackgroundImage.Visible = false
 	end
@@ -5672,6 +5667,51 @@ function Library:Window(Data)
 			Parent = Header,
 		})
 
+		UnMinimize:Connect(function()
+			task.delay(0.3, function()
+				for _, Tab in pairs(Tabs:GetChildren()) do
+					if Tab:FindFirstChildOfClass("UIPadding") then
+						local Padding = Tab:FindFirstChildOfClass("UIPadding")
+						local CurrentPadding = Padding.PaddingLeft
+						Padding.PaddingLeft = UDim.new(0, -4)
+
+						local Animation = Signal:Animate(
+							Padding,
+							{ Time = 0.25, Style = Enum.EasingStyle.Sine, Direction = Enum.EasingDirection.Out },
+							{ PaddingLeft = CurrentPadding }
+						)
+
+						Animation.Completed:Wait()
+					end
+				end
+			end)
+		end)
+
+		UnMinimize:Connect(function()
+			if not Controller.SelectedContainer then
+				return
+			end
+
+			task.delay(0.3, function()
+				for _, Padding in pairs(Controller.SelectedContainer:GetChildren()) do
+					if Padding:IsA("UIPadding") then
+						local LeftPadding = Padding.PaddingLeft
+						local RightPadding = Padding.PaddingRight
+						Padding.PaddingLeft = UDim.new(0, 5)
+						Padding.PaddingRight = UDim.new(0, 5)
+
+						local Animation = Signal:Animate(
+							Padding,
+							{ Time = 0.25, Style = Enum.EasingStyle.Sine, Direction = Enum.EasingDirection.Out },
+							{ PaddingLeft = LeftPadding, PaddingRight = RightPadding }
+						)
+
+						Animation.Completed:Wait()
+					end
+				end
+			end)
+		end)
+
 		SetProfileAnonimity:Connect(function(Object, Value)
 			if Object == "Username" then
 				if Value then
@@ -5771,7 +5811,7 @@ function Library:Window(Data)
 			)
 		end
 
-		task.delay(0.35, function()
+		task.delay(0.3, function()
 			if not Controller.IsMinimized and Controller.CurrentOverlay then
 				Controller.CurrentOverlay.Visible = true
 			end
